@@ -1,0 +1,40 @@
+{
+  "name": "diva-irma-js",
+  "version": "1.0.0",
+  "description": "An SDK to easily integrate IRMA (https://privacybydesign.foundation/irma/) into NodeJS based apps.",
+  "main": "src/diva.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Alliander/diva-irma-js.git"
+  },
+  "keywords": [
+    "irma",
+    "attributes",
+    "privacy",
+    "identity",
+    "management"
+  ],
+  "files": [
+    "CONTRIBUTING.md",
+    "README.md",
+    "src/*",
+    "diva.js",
+    "LICENSE"
+  ],
+  "contributors": [
+    "Koen van Ingen",
+    "Timen Olthof",
+    "Alliander N.V. (https://alliander.com/)"
+  ],
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "eslint": "4.8.0",
+    "eslint-config-airbnb": "15.1.0",
+    "eslint-plugin-import": "2.7.0",
+    "eslint-plugin-jsx-a11y": "5.1.1",
+    "eslint-plugin-react": "7.4.0"
+  }
+}
