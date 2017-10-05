@@ -1,0 +1,10 @@
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+dist
+build
+
+# Other
+.DS_Store
+*.swp
