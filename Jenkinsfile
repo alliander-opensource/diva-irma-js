@@ -1,5 +1,5 @@
 node{
-  def nodeHome = tool name: 'nodejs-6.11.1', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
+  def nodeHome = tool name: 'nodejs-8.6.0', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
   env.PATH = "${nodeHome}/bin:${env.PATH}"
 
   stage ('Checkout') {
