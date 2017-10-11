@@ -10,7 +10,7 @@ exports.version = function version() {
 exports.addProof = function addProof(divaSessionState, proof) {
   divaSessionState.user.attributes.push(proof);
   return divaSessionState;
-}
+};
 
 exports.deauthenticate = function deauthenticate() {
   return {
@@ -19,10 +19,10 @@ exports.deauthenticate = function deauthenticate() {
       attributes: [],
     },
   };
-}
+};
 
 exports.requireAttribute = function requireAttribute(attribute) {
-  return function (req, res, next) {
+  return (req, res, next) => {
     if (req.divaSessionState.user.attributes.indexOf(attribute) > -1) {
       next();
     } else {
@@ -34,4 +34,4 @@ exports.requireAttribute = function requireAttribute(attribute) {
         });
     }
   };
-}
+};
