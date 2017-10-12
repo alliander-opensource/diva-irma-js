@@ -1,6 +1,26 @@
 const uuidv4 = require('uuid/v4');
+const jwt = require('jsonwebtoken');
+const request = require('superagent');
 
 const packageJson = require('./../package.json');
+
+// TODO get these from appconfig
+const divaConfig = {
+  apiKey: 'SECRET',
+-----END RSA PRIVATE KEY-----`,
+  irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
+  irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
+P+V1qV6AIzhxFlBO8k0GLogMUT6UXJSnXQ3P7iTIfr+/5+yf4dfKNHhalphe+2OB
+zspt6zymteKAuQ9/NwUNGTSP4l8mD8wQb5ZyiNMUt6leu42SPe/7uOtcRA6AzN2L
+6eKNqUGpNvQZTVwEFNNNiChqrkmQVnoyWVe6fHHooxTCtIyXWJY2WqC8lYStIbZc
+NP5xwUdLGOuGo41T7Q+wkR5KqXDif+FKoR7qlG7jEUHcbd1OQe7b6DxzSHCI65Bw
+TIZwMj2LtEwB6Op7vemHkeNaPAYK33t5kdyq+P55KMDuJgj+nxpFO00U4msD+CRa
+7QIDAQAB
+-----END PUBLIC KEY-----`,
+};
+
+const verificationEndpoint = '/api/v2/verification';
 
 exports.version = function version() {
   return packageJson.version;
@@ -26,12 +46,60 @@ exports.requireAttribute = function requireAttribute(attribute) {
     if (req.divaSessionState.user.attributes.indexOf(attribute) > -1) {
       next();
     } else {
+      const attributesLabel = 'Geslacht';
       res
-        .status(401)
-        .send({
-          success: false,
-          message: `You are missing attribute  ${attribute}`,
-        });
+        .redirect(`/api/attributes-required?attribute=${attribute}&attributesLabel=${attributesLabel}`);
+      // res
+      //   .status(401)
+      //   .send({
+      //     success: false,
+      //     requiredAttributes: [attribute],
+      //     message: `You are missing attribute ${attribute}`,
+      //   });
     }
   };
+};
+
+exports.startDisclosureSession = function startDisclosureSession(
+  divaSessionId,
+  attribute,
+  attributesLabel,
+) {
+  const sprequest = {
+    data: divaSessionId,
+    validity: 60,
+    timeout: 60,
+    request: {
+      content: [
+        {
+          label: attributesLabel,
+          attributes: [attribute],
+        },
+      ],
+    },
+  };
+
+  const jwtOptions = {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'verification_request',
+  };
+
+  const signedVerificationRequestJwt = jwt.sign(
+    { sprequest },
+    divaConfig.apiKey,
+    jwtOptions,
+  );
+
+  return request
+    .post(divaConfig.irmaApiServerUrl + verificationEndpoint)
+    .type('text/plain')
+    .send(signedVerificationRequestJwt)
+    .then(result => JSON.stringify(result.body))
+    .catch((error) => {
+      // console.log(error);
+      // TODO: make this a typed error
+      const e = new Error(`Error starting IRMA session: ${error.message}`);
+      return e;
+    });
 };
