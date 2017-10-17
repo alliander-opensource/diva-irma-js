@@ -4,8 +4,6 @@
  * BSD 3-Clause License
  */
 
-'use strict';
-
 // TODO get these from appconfig
 const appConfig = {
   baseUrl: 'http://localhost/',
@@ -48,19 +46,6 @@ const request = require('superagent');
 
 const packageJson = require('./../package.json');
 
-/**
-* Module exports.
-* @public
-*/
-
-module.exports = divaCookieParser;
-module.exports.version = version;
-module.exports.addProof = addProof;
-module.exports.deauthenticate = deauthenticate;
-module.exports.requireAttribute = requireAttribute;
-module.exports.sendCookie = sendCookie;
-module.exports.startDisclosureSession = startDisclosureSession;
-
 function divaCookieParser(req, res, next) {
   if (typeof req.signedCookies[divaConfig.cookieName] === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user === 'undefined' ||
@@ -72,17 +57,17 @@ function divaCookieParser(req, res, next) {
     req.divaSessionState = req.signedCookies[divaConfig.cookieName];
   }
   next();
-};
+}
 
 function version() {
   return packageJson.version;
-};
+}
 
 // TODO make this more functional
 function addProof(divaSessionState, proof) {
   divaSessionState.user.attributes.push(proof);
   return divaSessionState;
-};
+}
 
 function deauthenticate() {
   return {
@@ -91,7 +76,7 @@ function deauthenticate() {
       attributes: [],
     },
   };
-};
+}
 
 function requireAttribute(attribute) {
   return (req, res, next) => {
@@ -110,11 +95,11 @@ function requireAttribute(attribute) {
       //   });
     }
   };
-};
+}
 
 function sendCookie(req, res) {
   res.cookie(divaConfig.divaCookieName, req.divaSessionState, divaConfig.cookieSettings);
-};
+}
 
 function startDisclosureSession(
   divaSessionId,
@@ -160,4 +145,17 @@ function startDisclosureSession(
       const e = new Error(`Error starting IRMA session: ${error.message}`);
       return e;
     });
-};
+}
+
+/**
+* Module exports.
+* @public
+*/
+
+module.exports = divaCookieParser;
+module.exports.version = version;
+module.exports.addProof = addProof;
+module.exports.deauthenticate = deauthenticate;
+module.exports.requireAttribute = requireAttribute;
+module.exports.sendCookie = sendCookie;
+module.exports.startDisclosureSession = startDisclosureSession;
