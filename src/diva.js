@@ -20,7 +20,7 @@ const divaConfig = {
     signed: true,
     secure: false, // TODO: NOTE: must be set to true and be used with HTTPS only!
   },
-  completeDisclosureSessionEndpoint: '/api/diva/completeDisclosureSession',
+  completeDisclosureSessionEndpoint: '/api/diva/complete-disclosure-session',
   irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
   irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
@@ -55,8 +55,8 @@ function divaCookieParser(req, res, next) {
       typeof req.signedCookies[divaConfig.cookieName].user === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user.sessionId === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user.attributes === 'undefined') {
-    req.divaSessionState = this.deauthenticate();
-    this.sendCookie(req, res);
+    req.divaSessionState = deauthenticate();
+    sendCookie(req, res);
   } else {
     req.divaSessionState = req.signedCookies[divaConfig.cookieName];
   }
