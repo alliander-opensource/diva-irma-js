@@ -39,6 +39,9 @@
     "eslint-plugin-react": "7.4.0"
   },
   "dependencies": {
+    "jsonwebtoken": "8.1.0",
+    "request": "2.83.0",
+    "superagent": "3.6.3",
     "uuid": "3.1.0"
   }
 }
