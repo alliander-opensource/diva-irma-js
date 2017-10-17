@@ -34,6 +34,10 @@ TIZwMj2LtEwB6Op7vemHkeNaPAYK33t5kdyq+P55KMDuJgj+nxpFO00U4msD+CRa
 };
 
 const verificationEndpoint = '/api/v2/verification';
+const jwtIrmaApiServerVerifyOptions = {
+  algorithm: 'RS256',
+  subject: 'disclosure_result',
+};
 
 // TODO fix state in a better way!
 const pendingProofs = {};
@@ -153,7 +157,6 @@ function startDisclosureSession(
     .send(signedVerificationRequestJwt)
     .then(result => JSON.stringify(result.body))
     .catch((error) => {
-      // console.log(error);
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA session: ${error.message}`);
       return e;
@@ -167,17 +170,15 @@ function startDisclosureSession(
  * @returns {Promise<json>} decoded IRMA JWT token from api server
  */
 function verifyIrmaApiServerJwt(token) {
-  // const key = config.irmaApiServerPublicKey;
-  // TODO: change decode to verify!
-  // return BPromise.try(() => jwt.verify(token, key, jwtIrmaApiServerStatusOptions));
-  return BPromise.try(() => jwt.decode(token));
+  const key = divaConfig.irmaApiServerPublicKey;
+  return BPromise.try(() => jwt.verify(token, key, jwtIrmaApiServerVerifyOptions));
 }
 
 /**
  * Check IRMA proof status
  * @function checkIrmaProofValidity
  * @param {json} jwtPayload IRMA JWT token from api server
- * @throws AuthenticationError if status is not equal to 'VALID'
+ * @throws Error if status is not equal to 'VALID'
  * @returns {Promise<json>} decoded IRMA JWT token from api server
  */
 function checkIrmaProofValidity(jwtPayload) {
@@ -188,6 +189,12 @@ function checkIrmaProofValidity(jwtPayload) {
   return BPromise.resolve(jwtPayload);
 }
 
+/**
+ * Verify an irma proof and return attributes and session
+ * @function checkIrmaProofValidity
+ * @param {string} IRMA proof jwt
+ * @returns {Promise<json>} Map with Diva session token and IRMA attributes
+ */
 function verifyProof(proof) {
   return verifyIrmaApiServerJwt(proof)
     .then(decoded => checkIrmaProofValidity(decoded))
