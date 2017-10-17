@@ -1,8 +1,10 @@
-const uuidv4 = require('uuid/v4');
-const jwt = require('jsonwebtoken');
-const request = require('superagent');
+/*!
+ * diva-irma-js
+ * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
+ * BSD 3-Clause License
+ */
 
-const packageJson = require('./../package.json');
+'use strict';
 
 // TODO get these from appconfig
 const appConfig = {
@@ -35,26 +37,31 @@ TIZwMj2LtEwB6Op7vemHkeNaPAYK33t5kdyq+P55KMDuJgj+nxpFO00U4msD+CRa
 
 const verificationEndpoint = '/api/v2/verification';
 
-exports.version = function version() {
-  return packageJson.version;
-};
+/**
+* Module dependencies.
+* @private
+*/
 
-// TODO make this more functional
-exports.addProof = function addProof(divaSessionState, proof) {
-  divaSessionState.user.attributes.push(proof);
-  return divaSessionState;
-};
+const uuidv4 = require('uuid/v4');
+const jwt = require('jsonwebtoken');
+const request = require('superagent');
 
-exports.deauthenticate = function deauthenticate() {
-  return {
-    user: {
-      sessionId: uuidv4(),
-      attributes: [],
-    },
-  };
-};
+const packageJson = require('./../package.json');
 
-exports.CookieParser = (req, res, next) => {
+/**
+* Module exports.
+* @public
+*/
+
+module.exports = divaCookieParser;
+module.exports.version = version;
+module.exports.addProof = addProof;
+module.exports.deauthenticate = deauthenticate;
+module.exports.requireAttribute = requireAttribute;
+module.exports.sendCookie = sendCookie;
+module.exports.startDisclosureSession = startDisclosureSession;
+
+function divaCookieParser(req, res, next) {
   if (typeof req.signedCookies[divaConfig.cookieName] === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user.sessionId === 'undefined' ||
@@ -67,7 +74,26 @@ exports.CookieParser = (req, res, next) => {
   next();
 };
 
-exports.requireAttribute = function requireAttribute(attribute) {
+function version() {
+  return packageJson.version;
+};
+
+// TODO make this more functional
+function addProof(divaSessionState, proof) {
+  divaSessionState.user.attributes.push(proof);
+  return divaSessionState;
+};
+
+function deauthenticate() {
+  return {
+    user: {
+      sessionId: uuidv4(),
+      attributes: [],
+    },
+  };
+};
+
+function requireAttribute(attribute) {
   return (req, res, next) => {
     if (req.divaSessionState.user.attributes.indexOf(attribute) > -1) {
       next();
@@ -86,11 +112,11 @@ exports.requireAttribute = function requireAttribute(attribute) {
   };
 };
 
-exports.sendCookie = function sendCookie(req, res) {
+function sendCookie(req, res) {
   res.cookie(divaConfig.divaCookieName, req.divaSessionState, divaConfig.cookieSettings);
 };
 
-exports.startDisclosureSession = function startDisclosureSession(
+function startDisclosureSession(
   divaSessionId,
   attribute,
   attributesLabel,
