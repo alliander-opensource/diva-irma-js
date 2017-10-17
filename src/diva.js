@@ -5,9 +5,22 @@ const request = require('superagent');
 const packageJson = require('./../package.json');
 
 // TODO get these from appconfig
+const appConfig = {
+  baseUrl: 'http://localhost/',
+};
+
 const divaConfig = {
   apiKey: 'SECRET',
------END RSA PRIVATE KEY-----`,
+  cookieSecret: 'StRoNGs3crE7',
+  cookieName: 'diva-session',
+  cookieSettings: {
+    httpOnly: true,
+    maxAge: 300000,
+    sameSite: true,
+    signed: true,
+    secure: false, // TODO: NOTE: must be set to true and be used with HTTPS only!
+  },
+  completeDisclosureSessionEndpoint: '/api/diva/completeDisclosureSession',
   irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
   irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
@@ -41,6 +54,19 @@ exports.deauthenticate = function deauthenticate() {
   };
 };
 
+exports.CookieParser = (req, res, next) => {
+  if (typeof req.signedCookies[divaConfig.cookieName] === 'undefined' ||
+      typeof req.signedCookies[divaConfig.cookieName].user === 'undefined' ||
+      typeof req.signedCookies[divaConfig.cookieName].user.sessionId === 'undefined' ||
+      typeof req.signedCookies[divaConfig.cookieName].user.attributes === 'undefined') {
+    req.divaSessionState = this.deauthenticate();
+    this.sendCookie(req, res);
+  } else {
+    req.divaSessionState = req.signedCookies[divaConfig.cookieName];
+  }
+  next();
+};
+
 exports.requireAttribute = function requireAttribute(attribute) {
   return (req, res, next) => {
     if (req.divaSessionState.user.attributes.indexOf(attribute) > -1) {
@@ -60,12 +86,18 @@ exports.requireAttribute = function requireAttribute(attribute) {
   };
 };
 
+exports.sendCookie = function(req, res) {
+  res.cookie(divaConfig.divaCookieName, req.divaSessionState, divaConfig.cookieSettings);
+}
+
 exports.startDisclosureSession = function startDisclosureSession(
   divaSessionId,
   attribute,
   attributesLabel,
 ) {
+  const callbackUrl = appConfig.baseUrl + divaConfig.divaCompleteDisclosureSessionEndpoint;
   const sprequest = {
+    callbackUrl,
     data: divaSessionId,
     validity: 60,
     timeout: 60,
