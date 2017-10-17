@@ -86,9 +86,9 @@ exports.requireAttribute = function requireAttribute(attribute) {
   };
 };
 
-exports.sendCookie = function(req, res) {
+exports.sendCookie = function sendCookie(req, res) {
   res.cookie(divaConfig.divaCookieName, req.divaSessionState, divaConfig.cookieSettings);
-}
+};
 
 exports.startDisclosureSession = function startDisclosureSession(
   divaSessionId,
