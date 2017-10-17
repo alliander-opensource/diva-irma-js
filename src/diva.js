@@ -36,7 +36,7 @@ TIZwMj2LtEwB6Op7vemHkeNaPAYK33t5kdyq+P55KMDuJgj+nxpFO00U4msD+CRa
 const verificationEndpoint = '/api/v2/verification';
 
 // TODO fix state in a better way!
-const proofMap = {};
+const pendingProofs = {};
 
 /**
 * Module dependencies.
@@ -72,14 +72,6 @@ function addProof(divaSessionState, proof) {
   divaSessionState.user.attributes.push(proof);
   return divaSessionState;
 }
-
-// TODO Do we really want this to be stateful?
-function completeDisclosureSession(proof) {
-  return verifyProof(proof)
-    .then((result) => {
-      addProofToSession(result.session, result.attributes, proof);
-    });
-};
 
 function deauthenticate() {
   return {
@@ -196,12 +188,20 @@ function verifyProof(proof) {
     }));
 }
 
-function addProofToSession(session, attributes, proof) {
-  proofMap[session] = {
+function addPendingProof(sessionId, attributes, proof) {
+  pendingProofs[sessionId] = {
     attributes, // TODO merge current attributes with already existing attributes in session
     proof, // include original proof as well TODO: merge with older proofs
   };
-  console.log(JSON.stringify(proofMap));
+  console.log(JSON.stringify(pendingProofs));
+}
+
+// TODO Do we really want this to be stateful?
+function completeDisclosureSession(proof) {
+  return verifyProof(proof)
+    .then((result) => {
+      addPendingProof(result.session, result.attributes, proof);
+    });
 }
 
 /**
