@@ -20,7 +20,7 @@ const divaConfig = {
     signed: true,
     secure: false, // TODO: NOTE: must be set to true and be used with HTTPS only!
   },
-  completeDisclosureSessionEndpoint: '/api/diva/completeDisclosureSession',
+  completeDisclosureSessionEndpoint: '/api/diva/complete-disclosure-session',
   irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
   irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
@@ -35,11 +35,15 @@ TIZwMj2LtEwB6Op7vemHkeNaPAYK33t5kdyq+P55KMDuJgj+nxpFO00U4msD+CRa
 
 const verificationEndpoint = '/api/v2/verification';
 
+// TODO fix state in a better way!
+const pendingProofs = {};
+
 /**
 * Module dependencies.
 * @private
 */
 
+const BPromise = require('bluebird');
 const uuidv4 = require('uuid/v4');
 const jwt = require('jsonwebtoken');
 const request = require('superagent');
@@ -51,8 +55,8 @@ function divaCookieParser(req, res, next) {
       typeof req.signedCookies[divaConfig.cookieName].user === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user.sessionId === 'undefined' ||
       typeof req.signedCookies[divaConfig.cookieName].user.attributes === 'undefined') {
-    req.divaSessionState = this.deauthenticate();
-    this.sendCookie(req, res);
+    req.divaSessionState = deauthenticate();
+    sendCookie(req, res);
   } else {
     req.divaSessionState = req.signedCookies[divaConfig.cookieName];
   }
@@ -148,6 +152,59 @@ function startDisclosureSession(
 }
 
 /**
+ * Decode and verify JWT verify token from api server and check validity/signature
+ * @function verifyIrmaJwt
+ * @param {string} token JWT string
+ * @returns {Promise<json>} decoded IRMA JWT token from api server
+ */
+function verifyIrmaApiServerJwt(token) {
+  // const key = config.irmaApiServerPublicKey;
+  // TODO: change decode to verify!
+  // return BPromise.try(() => jwt.verify(token, key, jwtIrmaApiServerStatusOptions));
+  return BPromise.try(() => jwt.decode(token));
+}
+
+/**
+ * Check IRMA proof status
+ * @function checkIrmaProofValidity
+ * @param {json} jwtPayload IRMA JWT token from api server
+ * @throws AuthenticationError if status is not equal to 'VALID'
+ * @returns {Promise<json>} decoded IRMA JWT token from api server
+ */
+function checkIrmaProofValidity(jwtPayload) {
+  const proofStatus = jwtPayload.status;
+  if (proofStatus !== 'VALID') {
+    throw new Error(`Invalid IRMA proof status: ${proofStatus}`); // TODO: custom error class
+  }
+  return BPromise.resolve(jwtPayload);
+}
+
+function verifyProof(proof) {
+  return verifyIrmaApiServerJwt(proof)
+    .then(decoded => checkIrmaProofValidity(decoded))
+    .then(checkedToken => ({
+      session: checkedToken.jti,
+      attributes: checkedToken.attributes,
+    }));
+}
+
+function addPendingProof(sessionId, attributes, proof) {
+  pendingProofs[sessionId] = {
+    attributes, // TODO merge current attributes with already existing attributes in session
+    proof, // include original proof as well TODO: merge with older proofs
+  };
+  console.log(JSON.stringify(pendingProofs));
+}
+
+// TODO Do we really want this to be stateful?
+function completeDisclosureSession(proof) {
+  return verifyProof(proof)
+    .then((result) => {
+      addPendingProof(result.session, result.attributes, proof);
+    });
+}
+
+/**
 * Module exports.
 * @public
 */
@@ -159,3 +216,4 @@ module.exports.deauthenticate = deauthenticate;
 module.exports.requireAttribute = requireAttribute;
 module.exports.sendCookie = sendCookie;
 module.exports.startDisclosureSession = startDisclosureSession;
+module.exports.completeDisclosureSession = completeDisclosureSession;
