@@ -92,35 +92,23 @@ function addAttributesToSession(divaSessionState, attributes) {
 }
 
 
-function getProofFromMap(proofMap, sessionId) {
+function getPendingAttributes(proofMap, sessionId) {
   if (proofMap.get(sessionId) === undefined) {
     return BPromise.reject(new Error('Proof does not exist')); // TODO custom error
   }
 
   const attributes = proofMap.get(sessionId).attributes;
 
-  return BPromise.resolve(attributes); // TODO also return proof?
-}
-
-function removeSessionFromMap(proofMap, sessionId) {
-  if (pendingProofs.get(sessionId) === undefined) {
-    return BPromise.reject(new Error('Proof does not exist')); // TODO custom error
-  }
-
   proofMap.delete(sessionId);
-  return proofMap;
+  return BPromise.resolve(attributes); // TODO also return proof?
 }
 
 
 function checkPendingProofs(divaSessionState) {
   const sessionId = divaSessionState.user.sessionId;
 
-  return getProofFromMap(pendingProofs, sessionId)
-    .then(attributes => addAttributesToSession(divaSessionState, attributes))
-    .then((newState) => {
-      removeSessionFromMap(pendingProofs, sessionId);
-      return newState;
-    });
+  return getPendingAttributes(pendingProofs, sessionId)
+    .then(attributes => addAttributesToSession(divaSessionState, attributes));
 }
 
 function requireAttribute(attribute) {
