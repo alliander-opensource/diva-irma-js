@@ -68,9 +68,17 @@ function version() {
 }
 
 // TODO make this more functional
+// TODO still needed?
 function addProof(divaSessionState, proof) {
   divaSessionState.user.attributes.push(proof);
   return divaSessionState;
+}
+
+function checkPendingProofs(divaSessionState) {
+  // divaSessionState.user.attributes.push({"pbdf.pbdf.idin.gender":"male"});
+  divaSessionState.user.attributes.push("bla");
+
+  return BPromise.resolve(divaSessionState);
 }
 
 function deauthenticate() {
@@ -102,7 +110,8 @@ function requireAttribute(attribute) {
 }
 
 function sendCookie(req, res) {
-  res.cookie(divaConfig.divaCookieName, req.divaSessionState, divaConfig.cookieSettings);
+  console.log('diva state: ', req.divaSessionState);
+  res.cookie(divaConfig.cookieName, req.divaSessionState, divaConfig.cookieSettings);
 }
 
 function startDisclosureSession(
@@ -217,3 +226,4 @@ module.exports.requireAttribute = requireAttribute;
 module.exports.sendCookie = sendCookie;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
+module.exports.checkPendingProofs = checkPendingProofs;
