@@ -40,7 +40,7 @@ const jwtIrmaApiServerVerifyOptions = {
 };
 
 // TODO fix state in a better way!
-const pendingProofs = {};
+const pendingProofs = new Map();
 
 /**
 * Module dependencies.
@@ -53,6 +53,19 @@ const jwt = require('jsonwebtoken');
 const request = require('superagent');
 
 const packageJson = require('./../package.json');
+
+function sendCookie(req, res) {
+  res.cookie(divaConfig.cookieName, req.divaSessionState, divaConfig.cookieSettings);
+}
+
+function deauthenticate() {
+  return {
+    user: {
+      sessionId: uuidv4(),
+      attributes: [],
+    },
+  };
+}
 
 function divaCookieParser(req, res, next) {
   if (typeof req.signedCookies[divaConfig.cookieName] === 'undefined' ||
@@ -72,26 +85,42 @@ function version() {
 }
 
 // TODO make this more functional
-// TODO still needed?
-function addProof(divaSessionState, proof) {
-  divaSessionState.user.attributes.push(proof);
+// TODO merge with existing attributes
+function addAttributesToSession(divaSessionState, attributes) {
+  divaSessionState.user.attributes.push(attributes);
   return divaSessionState;
 }
 
-function checkPendingProofs(divaSessionState) {
-  // divaSessionState.user.attributes.push({"pbdf.pbdf.idin.gender":"male"});
-  divaSessionState.user.attributes.push("bla");
 
-  return BPromise.resolve(divaSessionState);
+function getProofFromMap(proofMap, sessionId) {
+  if (proofMap.get(sessionId) === undefined) {
+    return BPromise.reject(new Error('Proof does not exist')); // TODO custom error
+  }
+
+  const attributes = proofMap.get(sessionId).attributes;
+
+  return BPromise.resolve(attributes); // TODO also return proof?
 }
 
-function deauthenticate() {
-  return {
-    user: {
-      sessionId: uuidv4(),
-      attributes: [],
-    },
-  };
+function removeSessionFromMap(proofMap, sessionId) {
+  if (pendingProofs.get(sessionId) === undefined) {
+    return BPromise.reject(new Error('Proof does not exist')); // TODO custom error
+  }
+
+  proofMap.delete(sessionId);
+  return proofMap;
+}
+
+
+function checkPendingProofs(divaSessionState) {
+  const sessionId = divaSessionState.user.sessionId;
+
+  return getProofFromMap(pendingProofs, sessionId)
+    .then(attributes => addAttributesToSession(divaSessionState, attributes))
+    .then((newState) => {
+      removeSessionFromMap(pendingProofs, sessionId);
+      return newState;
+    });
 }
 
 function requireAttribute(attribute) {
@@ -111,11 +140,6 @@ function requireAttribute(attribute) {
       //   });
     }
   };
-}
-
-function sendCookie(req, res) {
-  console.log('diva state: ', req.divaSessionState);
-  res.cookie(divaConfig.cookieName, req.divaSessionState, divaConfig.cookieSettings);
 }
 
 function startDisclosureSession(
@@ -205,11 +229,10 @@ function verifyProof(proof) {
 }
 
 function addPendingProof(sessionId, attributes, proof) {
-  pendingProofs[sessionId] = {
+  pendingProofs.set(sessionId, {
     attributes, // TODO merge current attributes with already existing attributes in session
-    proof, // include original proof as well TODO: merge with older proofs
-  };
-  console.log(JSON.stringify(pendingProofs));
+    proof,
+  });
 }
 
 // TODO Do we really want this to be stateful?
@@ -227,7 +250,6 @@ function completeDisclosureSession(proof) {
 
 module.exports = divaCookieParser;
 module.exports.version = version;
-module.exports.addProof = addProof;
 module.exports.deauthenticate = deauthenticate;
 module.exports.requireAttribute = requireAttribute;
 module.exports.sendCookie = sendCookie;
