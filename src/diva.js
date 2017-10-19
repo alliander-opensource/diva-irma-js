@@ -69,9 +69,10 @@ function requireAttribute(attribute) {
     if (checkAttribute(req.divaSessionState.session, attribute)) {
       next();
     } else {
+      // TODO: make redirect and label not hard-coded
       const attributesLabel = 'Geslacht';
       res
-        .redirect(`/api/attributes-required?attribute=${attribute}&attributesLabel=${attributesLabel}`);
+        .redirect(`/api/start-disclosure-session?attribute=${attribute}&attributesLabel=${attributesLabel}`);
       // res
       //   .status(401)
       //   .send({
