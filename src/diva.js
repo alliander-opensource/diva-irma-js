@@ -178,35 +178,23 @@ function verifyProof(proof) {
     }));
 }
 
-function serializeAttributeEntry(attribute) {
-  return BPromise.resolve({
-    attributeName: attribute,
-    attributeValue: this[attribute],
-  });
-}
-
-function pushAll(entry) {
-  return BPromise.resolve(
-    this.push(entry),
-  );
-}
-
 function addIrmaProof(divaSessionId, attributes, proof) {
   const divaStateEntry = divaState.get(divaSessionId);
   const currentAttributes = (divaStateEntry !== undefined) ? divaStateEntry.attributes : [];
   const currentProofs = (divaStateEntry !== undefined) ? divaStateEntry.proofs : [];
 
-  return BPromise.all(Object.keys(attributes).map(serializeAttributeEntry, attributes))
-    .then(newAttributes => BPromise.all(newAttributes.map(pushAll, currentAttributes)))
-    .then(() => {
-      // currentAttributes.push(newAttributes);
-      currentProofs.push(proof);
-
-      return divaState.set(divaSessionId, {
-        attributes: currentAttributes,
-        proofs: currentProofs,
-      });
+  Object.keys(attributes).forEach((attributeName) => {
+    currentAttributes.push({
+      attributeName,
+      attributeValue: attributes[attributeName],
     });
+  });
+  currentProofs.push(proof);
+
+  return divaState.set(divaSessionId, {
+    attributes: currentAttributes,
+    proofs: currentProofs,
+  });
 }
 
 // TODO Do we really want this to be stateful?
