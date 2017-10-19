@@ -20,7 +20,7 @@ const divaConfig = {
     signed: true,
     secure: false, // TODO: NOTE: must be set to true and be used with HTTPS only!
   },
-  completeDisclosureSessionEndpoint: '/api/diva/complete-disclosure-session',
+  completeDisclosureSessionEndpoint: '/api/complete-disclosure-session',
   irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
   irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
@@ -57,9 +57,16 @@ function version() {
   return packageJson.version;
 }
 
+// TODO: make this check more sophisticated
+function checkAttribute(divaSessionId, attribute) {
+  return divaState.get(divaSessionId) !== undefined &&
+    divaState.get(divaSessionId).attributes !== undefined &&
+  divaState.get(divaSessionId).attributes[attribute] !== undefined;
+}
+
 function requireAttribute(attribute) {
   return (req, res, next) => {
-    if (req.divaSessionState.user.attributes.indexOf(attribute) > -1) {
+    if (checkAttribute(req.divaSessionState.session, attribute)) {
       next();
     } else {
       const attributesLabel = 'Geslacht';
@@ -76,12 +83,19 @@ function requireAttribute(attribute) {
   };
 }
 
+function addApiServerUrl(qrContent) {
+  return {
+    ...qrContent,
+    u: `${divaConfig.irmaApiServerUrl}${verificationEndpoint}/${qrContent.u}`,
+  };
+}
+
 function startDisclosureSession(
   divaSessionId,
   attribute,
   attributesLabel,
 ) {
-  const callbackUrl = appConfig.baseUrl + divaConfig.divaCompleteDisclosureSessionEndpoint;
+  const callbackUrl = appConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
   const sprequest = {
     callbackUrl,
     data: divaSessionId,
@@ -113,7 +127,8 @@ function startDisclosureSession(
     .post(divaConfig.irmaApiServerUrl + verificationEndpoint)
     .type('text/plain')
     .send(signedVerificationRequestJwt)
-    .then(result => JSON.stringify(result.body))
+    .then(result => addApiServerUrl(result.body))
+    .then(JSON.stringify)
     .catch((error) => {
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA session: ${error.message}`);
@@ -181,7 +196,11 @@ function getAttributes(divaSessionId) {
   if (divaState.get(divaSessionId) === undefined) {
     return {};
   }
-  return divaState.get(divaSessionId);
+  return divaState.get(divaSessionId).attributes;
+}
+
+function removeDivaSession(divaSessionId) {
+  return divaState.delete(divaSessionId);
 }
 
 /**
@@ -194,3 +213,4 @@ module.exports.requireAttribute = requireAttribute;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
 module.exports.getAttributes = getAttributes;
+module.exports.removeDivaSession = removeDivaSession;
