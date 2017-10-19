@@ -20,7 +20,7 @@ const divaConfig = {
     signed: true,
     secure: false, // TODO: NOTE: must be set to true and be used with HTTPS only!
   },
-  completeDisclosureSessionEndpoint: '/api/diva/complete-disclosure-session',
+  completeDisclosureSessionEndpoint: '/api/complete-disclosure-session',
   irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
   irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
@@ -40,7 +40,7 @@ const jwtIrmaApiServerVerifyOptions = {
 };
 
 // TODO fix state in a better way!
-const pendingProofs = new Map();
+const divaState = new Map();
 
 /**
 * Module dependencies.
@@ -48,77 +48,31 @@ const pendingProofs = new Map();
 */
 
 const BPromise = require('bluebird');
-const uuidv4 = require('uuid/v4');
 const jwt = require('jsonwebtoken');
 const request = require('superagent');
 
 const packageJson = require('./../package.json');
 
-function sendCookie(req, res) {
-  res.cookie(divaConfig.cookieName, req.divaSessionState, divaConfig.cookieSettings);
-}
-
-function deauthenticate() {
-  return {
-    user: {
-      sessionId: uuidv4(),
-      attributes: [],
-    },
-  };
-}
-
-function divaCookieParser(req, res, next) {
-  if (typeof req.signedCookies[divaConfig.cookieName] === 'undefined' ||
-      typeof req.signedCookies[divaConfig.cookieName].user === 'undefined' ||
-      typeof req.signedCookies[divaConfig.cookieName].user.sessionId === 'undefined' ||
-      typeof req.signedCookies[divaConfig.cookieName].user.attributes === 'undefined') {
-    req.divaSessionState = deauthenticate();
-    sendCookie(req, res);
-  } else {
-    req.divaSessionState = req.signedCookies[divaConfig.cookieName];
-  }
-  next();
-}
-
 function version() {
   return packageJson.version;
 }
 
-// TODO make this more functional
-// TODO merge with existing attributes
-function addAttributesToSession(divaSessionState, attributes) {
-  divaSessionState.user.attributes.push(attributes);
-  return divaSessionState;
-}
-
-
-function getPendingAttributes(proofMap, sessionId) {
-  if (proofMap.get(sessionId) === undefined) {
-    return BPromise.reject(new Error('Proof does not exist')); // TODO custom error
-  }
-
-  const attributes = proofMap.get(sessionId).attributes;
-
-  proofMap.delete(sessionId);
-  return BPromise.resolve(attributes); // TODO also return proof?
-}
-
-
-function checkPendingProofs(divaSessionState) {
-  const sessionId = divaSessionState.user.sessionId;
-
-  return getPendingAttributes(pendingProofs, sessionId)
-    .then(attributes => addAttributesToSession(divaSessionState, attributes));
+// TODO: make this check more sophisticated
+function checkAttribute(divaSessionId, attribute) {
+  return divaState.get(divaSessionId) !== undefined &&
+    divaState.get(divaSessionId).attributes !== undefined &&
+  divaState.get(divaSessionId).attributes[attribute] !== undefined;
 }
 
 function requireAttribute(attribute) {
   return (req, res, next) => {
-    if (req.divaSessionState.user.attributes.indexOf(attribute) > -1) {
+    if (checkAttribute(req.divaSessionState.sessionId, attribute)) {
       next();
     } else {
+      // TODO: make redirect and label not hard-coded
       const attributesLabel = 'Geslacht';
       res
-        .redirect(`/api/attributes-required?attribute=${attribute}&attributesLabel=${attributesLabel}`);
+        .redirect(`/api/start-disclosure-session?attribute=${attribute}&attributesLabel=${attributesLabel}`);
       // res
       //   .status(401)
       //   .send({
@@ -130,12 +84,19 @@ function requireAttribute(attribute) {
   };
 }
 
+function addApiServerUrl(qrContent) {
+  return {
+    ...qrContent,
+    u: `${divaConfig.irmaApiServerUrl}${verificationEndpoint}/${qrContent.u}`,
+  };
+}
+
 function startDisclosureSession(
   divaSessionId,
   attribute,
   attributesLabel,
 ) {
-  const callbackUrl = appConfig.baseUrl + divaConfig.divaCompleteDisclosureSessionEndpoint;
+  const callbackUrl = appConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
   const sprequest = {
     callbackUrl,
     data: divaSessionId,
@@ -167,7 +128,8 @@ function startDisclosureSession(
     .post(divaConfig.irmaApiServerUrl + verificationEndpoint)
     .type('text/plain')
     .send(signedVerificationRequestJwt)
-    .then(result => JSON.stringify(result.body))
+    .then(result => addApiServerUrl(result.body))
+    .then(JSON.stringify)
     .catch((error) => {
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA session: ${error.message}`);
@@ -211,15 +173,27 @@ function verifyProof(proof) {
   return verifyIrmaApiServerJwt(proof)
     .then(decoded => checkIrmaProofValidity(decoded))
     .then(checkedToken => ({
-      session: checkedToken.jti,
+      divaSessionId: checkedToken.jti,
       attributes: checkedToken.attributes,
     }));
 }
 
-function addPendingProof(sessionId, attributes, proof) {
-  pendingProofs.set(sessionId, {
-    attributes, // TODO merge current attributes with already existing attributes in session
-    proof,
+function addIrmaProof(divaSessionId, attributes, proof) {
+  const divaStateEntry = divaState.get(divaSessionId);
+  const currentAttributes = (divaStateEntry !== undefined) ? divaStateEntry.attributes : [];
+  const currentProofs = (divaStateEntry !== undefined) ? divaStateEntry.proofs : [];
+
+  Object.keys(attributes).forEach((attributeName) => {
+    currentAttributes.push({
+      attributeName,
+      attributeValue: attributes[attributeName],
+    });
+  });
+  currentProofs.push(proof);
+
+  return divaState.set(divaSessionId, {
+    attributes: currentAttributes,
+    proofs: currentProofs,
   });
 }
 
@@ -227,8 +201,26 @@ function addPendingProof(sessionId, attributes, proof) {
 function completeDisclosureSession(proof) {
   return verifyProof(proof)
     .then((result) => {
-      addPendingProof(result.session, result.attributes, proof);
+      addIrmaProof(result.divaSessionId, result.attributes, proof);
     });
+}
+
+function getAttributes(divaSessionId) {
+  if (divaState.get(divaSessionId) === undefined) {
+    return [];
+  }
+  return divaState.get(divaSessionId).attributes;
+}
+
+function getProofs(divaSessionId) {
+  if (divaState.get(divaSessionId) === undefined) {
+    return [];
+  }
+  return divaState.get(divaSessionId).proofs;
+}
+
+function removeDivaSession(divaSessionId) {
+  return divaState.delete(divaSessionId);
 }
 
 /**
@@ -236,11 +228,10 @@ function completeDisclosureSession(proof) {
 * @public
 */
 
-module.exports = divaCookieParser;
 module.exports.version = version;
-module.exports.deauthenticate = deauthenticate;
 module.exports.requireAttribute = requireAttribute;
-module.exports.sendCookie = sendCookie;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
-module.exports.checkPendingProofs = checkPendingProofs;
+module.exports.getAttributes = getAttributes;
+module.exports.getProofs = getProofs;
+module.exports.removeDivaSession = removeDivaSession;
