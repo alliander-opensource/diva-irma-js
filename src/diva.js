@@ -66,7 +66,7 @@ function checkAttribute(divaSessionId, attribute) {
 
 function requireAttribute(attribute) {
   return (req, res, next) => {
-    if (checkAttribute(req.divaSessionState.session, attribute)) {
+    if (checkAttribute(req.divaSessionState.sessionId, attribute)) {
       next();
     } else {
       // TODO: make redirect and label not hard-coded
@@ -178,18 +178,42 @@ function verifyProof(proof) {
     }));
 }
 
-function addProof(divaSessionId, attributes, proof) {
-  divaState.set(divaSessionId, {
-    attributes, // TODO merge current attributes with already existing attributes in session
-    proof,
+function serializeAttributeEntry(attribute) {
+  return BPromise.resolve({
+    attributeName: attribute,
+    attributeValue: this[attribute],
   });
+}
+
+function pushAll(entry) {
+  return BPromise.resolve(
+    this.push(entry),
+  );
+}
+
+function addIrmaProof(divaSessionId, attributes, proof) {
+  const divaStateEntry = divaState.get(divaSessionId);
+  const currentAttributes = (divaStateEntry !== undefined) ? divaStateEntry.attributes : [];
+  const currentProofs = (divaStateEntry !== undefined) ? divaStateEntry.proofs : [];
+
+  return BPromise.all(Object.keys(attributes).map(serializeAttributeEntry, attributes))
+    .then(newAttributes => BPromise.all(newAttributes.map(pushAll, currentAttributes)))
+    .then(() => {
+      // currentAttributes.push(newAttributes);
+      currentProofs.push(proof);
+
+      return divaState.set(divaSessionId, {
+        attributes: currentAttributes,
+        proofs: currentProofs,
+      });
+    });
 }
 
 // TODO Do we really want this to be stateful?
 function completeDisclosureSession(proof) {
   return verifyProof(proof)
     .then((result) => {
-      addProof(result.divaSessionId, result.attributes, proof);
+      addIrmaProof(result.divaSessionId, result.attributes, proof);
     });
 }
 
@@ -198,6 +222,13 @@ function getAttributes(divaSessionId) {
     return {};
   }
   return divaState.get(divaSessionId).attributes;
+}
+
+function getProofs(divaSessionId) {
+  if (divaState.get(divaSessionId) === undefined) {
+    return [];
+  }
+  return divaState.get(divaSessionId).proofs;
 }
 
 function removeDivaSession(divaSessionId) {
@@ -214,4 +245,5 @@ module.exports.requireAttribute = requireAttribute;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
 module.exports.getAttributes = getAttributes;
+module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
