@@ -207,7 +207,7 @@ function completeDisclosureSession(proof) {
 
 function getAttributes(divaSessionId) {
   if (divaState.get(divaSessionId) === undefined) {
-    return {};
+    return [];
   }
   return divaState.get(divaSessionId).attributes;
 }
