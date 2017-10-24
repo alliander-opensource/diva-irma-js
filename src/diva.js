@@ -32,24 +32,56 @@ function init(options) {
   };
 }
 
-// TODO: make this check more sophisticated
-function checkAttribute(divaSessionId, attribute) {
-  return divaState.get(divaSessionId) !== undefined &&
-    divaState.get(divaSessionId).attributes !== undefined &&
-  divaState.get(divaSessionId).attributes[attribute] !== undefined;
+function mergeAttribute(attributes, attributeName, attributeValue) {
+  if (attributes.get(attributeName) === undefined) {
+    return {
+      ...attributes,
+      attributeName: [attributeValue],
+    };
+  }
+
+  return {
+    ...attributes,
+    attributeName: attributes[attributeName].push(attributeValue),
+  };
 }
 
-function requireAttribute(attribute) {
+function getAttributes(divaSessionId) {
+  if (divaState.get(divaSessionId) === undefined) {
+    return new Map();
+  }
+
+  let attributes = new Map();
+  divaState.get(divaSessionId).forEach((proof) => {
+    if (proof.status === 'VALID') {
+      const attributeMap = proof.attributes;
+      Object.keys(attributeMap).forEach((name) => {
+        attributes = mergeAttribute(attributes, name, attributeMap[name]);
+      });
+    }
+  });
+
+  return attributes;
+}
+
+function checkAttributes(divaSessionId, requiredAttributes) {
+  const existingAttributes = getAttributes(divaSessionId).keys();
+
+  return requiredAttributes.filter(
+    el => existingAttributes.includes(el)).length === 0;
+}
+
+function requireAttributes(attributes) {
   return (req, res, next) => {
-    if (checkAttribute(req.sessionId, attribute)) {
+    if (checkAttributes(req.sessionId, attributes)) {
       next();
     } else {
       res
         .status(401)
         .send({
           success: false,
-          requiredAttributes: [attribute],
-          message: `You are missing attribute ${attribute}`,
+          requiredAttributes: attributes,
+          message: `You are missing attributes: ${attributes}`,
         });
     }
   };
@@ -64,7 +96,7 @@ function updateQRContentWithApiEndpoint(qrContent) {
 
 function startDisclosureSession(
   divaSessionId,
-  attribute,
+  attributes,
   attributesLabel,
 ) {
   const callbackUrl = divaConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
@@ -77,7 +109,7 @@ function startDisclosureSession(
       content: [
         {
           label: attributesLabel,
-          attributes: [attribute],
+          attributes,
         },
       ],
     },
@@ -142,38 +174,6 @@ function completeDisclosureSession(irmaSessionId, token) {
     });
 }
 
-function mergeAttribute(attributes, attributeName, attributeValue) {
-  if (attributes.get(attributeName) === undefined) {
-    return {
-      ...attributes,
-      attributeName: [attributeValue],
-    };
-  }
-
-  return {
-    ...attributes,
-    attributeName: attributes[attributeName].push(attributeValue),
-  };
-}
-
-function getAttributes(divaSessionId) {
-  if (divaState.get(divaSessionId) === undefined) {
-    return new Map();
-  }
-
-  let attributes = new Map();
-  divaState.get(divaSessionId).forEach((proof) => {
-    if (proof.status === 'VALID') {
-      const attributeMap = proof.attributes;
-      Object.keys(attributeMap).forEach((name) => {
-        attributes = mergeAttribute(attributes, name, attributeMap[name]);
-      });
-    }
-  });
-
-  return attributes;
-}
-
 function getProofs(divaSessionId) {
   if (divaState.get(divaSessionId) === undefined) {
     return new Map();
@@ -205,7 +205,7 @@ function getProofStatus(divaSessionId, irmaSessionId) {
 
 module.exports.version = version;
 module.exports.init = init;
-module.exports.requireAttribute = requireAttribute;
+module.exports.requireAttributes = requireAttributes;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
 module.exports.getAttributes = getAttributes;
