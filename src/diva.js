@@ -4,43 +4,9 @@
  * BSD 3-Clause License
  */
 
-// TODO get these from appconfig
-const appConfig = {
-  baseUrl: 'http://localhost/',
-};
-
-const divaConfig = {
-  apiKey: 'SECRET',
-  cookieSecret: 'StRoNGs3crE7',
-  cookieName: 'diva-session',
-  cookieSettings: {
-    httpOnly: true,
-    maxAge: 300000,
-    sameSite: true,
-    signed: true,
-    secure: false, // TODO: NOTE: must be set to true and be used with HTTPS only!
-  },
-  completeDisclosureSessionEndpoint: '/api/complete-disclosure-session',
-  irmaApiServerUrl: 'https://dev-diva-irma-api-server.appx.cloud',
-  irmaApiServerPublicKey: `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAql7fb0EMMkqKcXIuvCVb
-P+V1qV6AIzhxFlBO8k0GLogMUT6UXJSnXQ3P7iTIfr+/5+yf4dfKNHhalphe+2OB
-zspt6zymteKAuQ9/NwUNGTSP4l8mD8wQb5ZyiNMUt6leu42SPe/7uOtcRA6AzN2L
-6eKNqUGpNvQZTVwEFNNNiChqrkmQVnoyWVe6fHHooxTCtIyXWJY2WqC8lYStIbZc
-NP5xwUdLGOuGo41T7Q+wkR5KqXDif+FKoR7qlG7jEUHcbd1OQe7b6DxzSHCI65Bw
-TIZwMj2LtEwB6Op7vemHkeNaPAYK33t5kdyq+P55KMDuJgj+nxpFO00U4msD+CRa
-7QIDAQAB
------END PUBLIC KEY-----`,
-};
-
-const verificationEndpoint = '/api/v2/verification';
-const jwtIrmaApiServerVerifyOptions = {
-  algorithm: 'RS256',
-  subject: 'disclosure_result',
-};
-
 // TODO fix state in a better way!
 const divaState = new Map();
+let divaConfig;
 
 /**
 * Module dependencies.
@@ -51,10 +17,18 @@ const BPromise = require('bluebird');
 const jwt = require('jsonwebtoken');
 const request = require('superagent');
 
+const defaults = require('./defaults');
 const packageJson = require('./../package.json');
 
 function version() {
   return packageJson.version;
+}
+
+function init(options) {
+  divaConfig = {
+    ...defaults,
+    ...options,
+  };
 }
 
 // TODO: make this check more sophisticated
@@ -66,20 +40,16 @@ function checkAttribute(divaSessionId, attribute) {
 
 function requireAttribute(attribute) {
   return (req, res, next) => {
-    if (checkAttribute(req.divaSessionState.sessionId, attribute)) {
+    if (checkAttribute(req.sessionId, attribute)) {
       next();
     } else {
-      // TODO: make redirect and label not hard-coded
-      const attributesLabel = 'Geslacht';
       res
-        .redirect(`/api/start-disclosure-session?attribute=${attribute}&attributesLabel=${attributesLabel}`);
-      // res
-      //   .status(401)
-      //   .send({
-      //     success: false,
-      //     requiredAttributes: [attribute],
-      //     message: `You are missing attribute ${attribute}`,
-      //   });
+        .status(401)
+        .send({
+          success: false,
+          requiredAttributes: [attribute],
+          message: `You are missing attribute ${attribute}`,
+        });
     }
   };
 }
@@ -87,7 +57,7 @@ function requireAttribute(attribute) {
 function addApiServerUrl(qrContent) {
   return {
     ...qrContent,
-    u: `${divaConfig.irmaApiServerUrl}${verificationEndpoint}/${qrContent.u}`,
+    u: `${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${qrContent.u}`,
   };
 }
 
@@ -96,7 +66,7 @@ function startDisclosureSession(
   attribute,
   attributesLabel,
 ) {
-  const callbackUrl = appConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
+  const callbackUrl = divaConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
   const sprequest = {
     callbackUrl,
     data: divaSessionId,
@@ -125,7 +95,7 @@ function startDisclosureSession(
   );
 
   return request
-    .post(divaConfig.irmaApiServerUrl + verificationEndpoint)
+    .post(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint)
     .type('text/plain')
     .send(signedVerificationRequestJwt)
     .then(result => addApiServerUrl(result.body))
@@ -145,7 +115,7 @@ function startDisclosureSession(
  */
 function verifyIrmaApiServerJwt(token) {
   const key = divaConfig.irmaApiServerPublicKey;
-  return BPromise.try(() => jwt.verify(token, key, jwtIrmaApiServerVerifyOptions));
+  return BPromise.try(() => jwt.verify(token, key, divaConfig.jwtIrmaApiServerVerifyOptions));
 }
 
 function addIrmaProof(proofResult, irmaSessionId) {
@@ -214,6 +184,7 @@ function removeDivaSession(divaSessionId) {
 */
 
 module.exports.version = version;
+module.exports.init = init;
 module.exports.requireAttribute = requireAttribute;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
