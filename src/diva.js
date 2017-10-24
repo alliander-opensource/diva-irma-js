@@ -148,75 +148,60 @@ function verifyIrmaApiServerJwt(token) {
   return BPromise.try(() => jwt.verify(token, key, jwtIrmaApiServerVerifyOptions));
 }
 
-/**
- * Check IRMA proof status
- * @function checkIrmaProofValidity
- * @param {json} jwtPayload IRMA JWT token from api server
- * @throws Error if status is not equal to 'VALID'
- * @returns {Promise<json>} decoded IRMA JWT token from api server
- */
-function checkIrmaProofValidity(jwtPayload) {
-  const proofStatus = jwtPayload.status;
-  if (proofStatus !== 'VALID') {
-    throw new Error(`Invalid IRMA proof status: ${proofStatus}`); // TODO: custom error class
+function addIrmaProof(proofResult, irmaSessionId) {
+  const divaSessionId = proofResult.jti;
+  const divaStateEntry = (divaState.get(divaSessionId) !== undefined)
+    ? divaState.get(divaSessionId)
+    : new Map();
+
+  divaStateEntry.set(irmaSessionId, proofResult);
+  divaState.set(divaSessionId, divaStateEntry);
+}
+
+function completeDisclosureSession(token, irmaSessionId) {
+  return verifyIrmaApiServerJwt(token)
+    .then((proofResult) => {
+      addIrmaProof(proofResult, irmaSessionId);
+    });
+}
+
+function mergeAttribute(attributes, attributeName, attributeValue) {
+  if (attributes.get(attributeName) === undefined) {
+    return {
+      ...attributes,
+      attributeName: [attributeValue],
+    };
   }
-  return BPromise.resolve(jwtPayload);
-}
 
-/**
- * Verify an irma proof and return attributes and session
- * @function checkIrmaProofValidity
- * @param {string} IRMA proof jwt
- * @returns {Promise<json>} Map with Diva session token and IRMA attributes
- */
-function verifyProof(proof) {
-  return verifyIrmaApiServerJwt(proof)
-    .then(decoded => checkIrmaProofValidity(decoded))
-    .then(checkedToken => ({
-      divaSessionId: checkedToken.jti,
-      attributes: checkedToken.attributes,
-    }));
-}
-
-function addIrmaProof(divaSessionId, attributes, proof) {
-  const divaStateEntry = divaState.get(divaSessionId);
-  const currentAttributes = (divaStateEntry !== undefined) ? divaStateEntry.attributes : [];
-  const currentProofs = (divaStateEntry !== undefined) ? divaStateEntry.proofs : [];
-
-  Object.keys(attributes).forEach((attributeName) => {
-    currentAttributes.push({
-      attributeName,
-      attributeValue: attributes[attributeName],
-    });
-  });
-  currentProofs.push(proof);
-
-  return divaState.set(divaSessionId, {
-    attributes: currentAttributes,
-    proofs: currentProofs,
-  });
-}
-
-// TODO Do we really want this to be stateful?
-function completeDisclosureSession(proof) {
-  return verifyProof(proof)
-    .then((result) => {
-      addIrmaProof(result.divaSessionId, result.attributes, proof);
-    });
+  return {
+    ...attributes,
+    attributeName: attributes[attributeName].push(attributeValue),
+  };
 }
 
 function getAttributes(divaSessionId) {
   if (divaState.get(divaSessionId) === undefined) {
-    return [];
+    return new Map();
   }
-  return divaState.get(divaSessionId).attributes;
+
+  let attributes = new Map();
+  divaState.get(divaSessionId).forEach((_, proof) => {
+    if (proof.status === 'VALID') {
+      const attributeMap = proof.attributes;
+      Object.keys(attributeMap).forEach((name) => {
+        attributes = mergeAttribute(attributes, name, attributeMap[name]);
+      });
+    }
+  });
+
+  return attributes;
 }
 
 function getProofs(divaSessionId) {
   if (divaState.get(divaSessionId) === undefined) {
-    return [];
+    return new Map();
   }
-  return divaState.get(divaSessionId).proofs;
+  return divaState.get(divaSessionId);
 }
 
 function removeDivaSession(divaSessionId) {
