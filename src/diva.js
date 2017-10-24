@@ -99,8 +99,8 @@ function startDisclosureSession(
     .post(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint)
     .type('text/plain')
     .send(signedVerificationRequestJwt)
-    .then(result => {
-      irmaState.set(result.body.u, "PENDING");
+    .then((result) => {
+      irmaState.set(result.body.u, 'PENDING');
       return {
         irmaSessionId: result.body.u,
         qrContent: updateQRContentWithApiEndpoint(result.body),
@@ -138,8 +138,7 @@ function completeDisclosureSession(irmaSessionId, token) {
   return verifyIrmaApiServerJwt(token)
     .then((proofResult) => {
       addIrmaProof(proofResult, irmaSessionId);
-      irmaState.set(irmaSessionId, "COMPLETED");
-      console.log("COMPLETED ", irmaSessionId);
+      irmaState.set(irmaSessionId, 'COMPLETED');
     });
 }
 
@@ -194,7 +193,7 @@ function getIrmaAPISessionStatus(irmaSessionId) {
 function getProofStatus(divaSessionId, irmaSessionId) {
   const proof = divaState.get(divaSessionId).get(irmaSessionId);
   if (!proof || !proof.status) {
-    return BPromise.resolve("UNKNOWN");
+    return BPromise.resolve('UNKNOWN');
   }
   return BPromise.resolve(proof.status);
 }
