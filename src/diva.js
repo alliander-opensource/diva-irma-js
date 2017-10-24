@@ -185,7 +185,7 @@ function getAttributes(divaSessionId) {
   }
 
   let attributes = new Map();
-  divaState.get(divaSessionId).forEach((_, proof) => {
+  divaState.get(divaSessionId).forEach((proof) => {
     if (proof.status === 'VALID') {
       const attributeMap = proof.attributes;
       Object.keys(attributeMap).forEach((name) => {
