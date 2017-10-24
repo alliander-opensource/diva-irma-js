@@ -193,7 +193,7 @@ function getIrmaAPISessionStatus(irmaSessionId) {
 
 function getProofStatus(divaSessionId, irmaSessionId) {
   const proof = divaState.get(divaSessionId).get(irmaSessionId);
-  if (!proof) {
+  if (!proof || !proof.status) {
     return BPromise.resolve("UNKNOWN");
   }
   return BPromise.resolve(proof.status);
