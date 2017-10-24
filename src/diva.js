@@ -6,6 +6,7 @@
 
 // TODO fix state in a better way!
 const divaState = new Map();
+const irmaState = new Map();
 let divaConfig;
 
 /**
@@ -54,7 +55,7 @@ function requireAttribute(attribute) {
   };
 }
 
-function addApiServerUrl(qrContent) {
+function updateQRContentWithApiEndpoint(qrContent) {
   return {
     ...qrContent,
     u: `${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${qrContent.u}`,
@@ -71,7 +72,7 @@ function startDisclosureSession(
     callbackUrl,
     data: divaSessionId,
     validity: 60,
-    timeout: 60,
+    timeout: 600,
     request: {
       content: [
         {
@@ -98,8 +99,13 @@ function startDisclosureSession(
     .post(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint)
     .type('text/plain')
     .send(signedVerificationRequestJwt)
-    .then(result => addApiServerUrl(result.body))
-    .then(JSON.stringify)
+    .then(result => {
+      irmaState.set(result.body.u, "PENDING");
+      return {
+        irmaSessionId: result.body.u,
+        qrContent: updateQRContentWithApiEndpoint(result.body),
+      };
+    })
     .catch((error) => {
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA session: ${error.message}`);
@@ -128,10 +134,12 @@ function addIrmaProof(proofResult, irmaSessionId) {
   divaState.set(divaSessionId, divaStateEntry);
 }
 
-function completeDisclosureSession(token, irmaSessionId) {
+function completeDisclosureSession(irmaSessionId, token) {
   return verifyIrmaApiServerJwt(token)
     .then((proofResult) => {
       addIrmaProof(proofResult, irmaSessionId);
+      irmaState.set(irmaSessionId, "COMPLETED");
+      console.log("COMPLETED ", irmaSessionId);
     });
 }
 
@@ -178,6 +186,19 @@ function removeDivaSession(divaSessionId) {
   return divaState.delete(divaSessionId);
 }
 
+function getIrmaAPISessionStatus(irmaSessionId) {
+  const irmaStatus = irmaState.get(irmaSessionId);
+  return BPromise.resolve(irmaStatus);
+}
+
+function getProofStatus(divaSessionId, irmaSessionId) {
+  const proof = divaState.get(divaSessionId).get(irmaSessionId);
+  if (!proof) {
+    return BPromise.resolve("UNKNOWN");
+  }
+  return BPromise.resolve(proof.status);
+}
+
 /**
 * Module exports.
 * @public
@@ -191,3 +212,5 @@ module.exports.completeDisclosureSession = completeDisclosureSession;
 module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
+module.exports.getIrmaAPISessionStatus = getIrmaAPISessionStatus;
+module.exports.getProofStatus = getProofStatus;
