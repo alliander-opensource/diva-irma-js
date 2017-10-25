@@ -5,8 +5,8 @@
  */
 
 // TODO fix state in a better way!
-const divaState = new Map();
-const irmaState = new Map();
+const divaState = {};
+const irmaState = {};
 let divaConfig;
 
 /**
@@ -33,20 +33,22 @@ function init(options) {
 }
 
 function mergeAttribute(attributes, attributeName, attributeValue) {
-  if (attributes.get(attributeName) === undefined) {
-    return new Map(attributes).set(attributeName, [attributeValue]);
+  const mergedAttributes = attributes;
+  if (attributes[attributeName] === undefined) {
+    mergedAttributes[attributeName] = [attributeValue];
+  } else {
+    mergedAttributes[attributeName] = attributes[attributeName].push(attributeValue);
   }
-
-  return new Map(attributes).set(attributeName, attributes[attributeName].push(attributeValue));
+  return mergedAttributes;
 }
 
 function getAttributes(divaSessionId) {
-  if (divaState.get(divaSessionId) === undefined) {
-    return new Map();
+  if (divaState[divaSessionId] === undefined) {
+    return {};
   }
 
-  let attributes = new Map();
-  divaState.get(divaSessionId).forEach((proof) => {
+  let attributes = {};
+  Object.values(divaState[divaSessionId]).forEach((proof) => {
     if (proof.status === 'VALID') {
       const attributeMap = proof.attributes;
       Object.keys(attributeMap).forEach((name) => {
@@ -59,7 +61,7 @@ function getAttributes(divaSessionId) {
 }
 
 function getMissingAttributes(divaSessionId, requiredAttributes) {
-  const existingAttributes = Array.from(getAttributes(divaSessionId).keys());
+  const existingAttributes = Object.keys(getAttributes(divaSessionId));
   return requiredAttributes.filter(el => !existingAttributes.includes(el));
 }
 
@@ -125,7 +127,7 @@ function startDisclosureSession(
     .type('text/plain')
     .send(signedVerificationRequestJwt)
     .then((result) => {
-      irmaState.set(result.body.u, 'PENDING');
+      irmaState[result.body.u] = 'PENDING';
       return {
         irmaSessionId: result.body.u,
         qrContent: updateQRContentWithApiEndpoint(result.body),
@@ -151,27 +153,27 @@ function verifyIrmaApiServerJwt(token) {
 
 function addIrmaProof(proofResult, irmaSessionId) {
   const divaSessionId = proofResult.jti;
-  const divaStateEntry = (divaState.get(divaSessionId) !== undefined)
-    ? divaState.get(divaSessionId)
-    : new Map();
+  const divaStateEntry = (divaState[divaSessionId] !== undefined)
+    ? divaState[divaSessionId]
+    : {};
 
-  divaStateEntry.set(irmaSessionId, proofResult);
-  divaState.set(divaSessionId, divaStateEntry);
+  divaStateEntry[irmaSessionId] = proofResult;
+  divaState[divaSessionId] = divaStateEntry;
 }
 
 function completeDisclosureSession(irmaSessionId, token) {
   return verifyIrmaApiServerJwt(token)
     .then((proofResult) => {
       addIrmaProof(proofResult, irmaSessionId);
-      irmaState.set(irmaSessionId, 'COMPLETED');
+      irmaState[irmaSessionId] = 'COMPLETED';
     });
 }
 
 function getProofs(divaSessionId) {
-  if (divaState.get(divaSessionId) === undefined) {
-    return new Map();
+  if (divaState[divaSessionId] === undefined) {
+    return {};
   }
-  return divaState.get(divaSessionId);
+  return divaState[divaSessionId];
 }
 
 function removeDivaSession(divaSessionId) {
@@ -179,12 +181,12 @@ function removeDivaSession(divaSessionId) {
 }
 
 function getIrmaAPISessionStatus(irmaSessionId) {
-  const irmaStatus = irmaState.get(irmaSessionId);
+  const irmaStatus = irmaState[irmaSessionId];
   return BPromise.resolve(irmaStatus);
 }
 
 function getProofStatus(divaSessionId, irmaSessionId) {
-  const proof = divaState.get(divaSessionId).get(irmaSessionId);
+  const proof = divaState[divaSessionId][irmaSessionId];
   if (!proof || !proof.status) {
     return BPromise.resolve('UNKNOWN');
   }
