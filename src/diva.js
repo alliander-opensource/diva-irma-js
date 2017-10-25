@@ -5,8 +5,8 @@
  */
 
 // TODO fix state in a better way!
-const divaState = new Map();
-const irmaState = new Map();
+const divaState = {};
+const irmaState = {};
 let divaConfig;
 
 /**
@@ -32,24 +32,51 @@ function init(options) {
   };
 }
 
-// TODO: make this check more sophisticated
-function checkAttribute(divaSessionId, attribute) {
-  return divaState.get(divaSessionId) !== undefined &&
-    divaState.get(divaSessionId).attributes !== undefined &&
-  divaState.get(divaSessionId).attributes[attribute] !== undefined;
+function mergeAttribute(attributes, attributeName, attributeValue) {
+  return attributes[attributeName] ? {
+    ...attributes,
+    [attributeName]: attributes[attributeName].push(attributeValue),
+  } : {
+    ...attributes,
+    [attributeName]: attributeValue,
+  };
 }
 
-function requireAttribute(attribute) {
+function getAttributes(divaSessionId) {
+  if (divaState[divaSessionId] === undefined) {
+    return {};
+  }
+
+  let attributes = {};
+  Object.values(divaState[divaSessionId]).forEach((proof) => {
+    if (proof.status === 'VALID') {
+      const attributeMap = proof.attributes;
+      Object.keys(attributeMap).forEach((name) => {
+        attributes = mergeAttribute(attributes, name, attributeMap[name]);
+      });
+    }
+  });
+
+  return attributes;
+}
+
+function getMissingAttributes(divaSessionId, requiredAttributes) {
+  const existingAttributes = Object.keys(getAttributes(divaSessionId));
+  return requiredAttributes.filter(el => !existingAttributes.includes(el));
+}
+
+function requireAttributes(attributes) {
   return (req, res, next) => {
-    if (checkAttribute(req.sessionId, attribute)) {
+    const missingAttributes = getMissingAttributes(req.sessionId, attributes);
+    if (missingAttributes.length === 0) {
       next();
     } else {
       res
         .status(401)
         .send({
           success: false,
-          requiredAttributes: [attribute],
-          message: `You are missing attribute ${attribute}`,
+          requiredAttributes: attributes,
+          message: `You are missing attributes: [${missingAttributes}]`,
         });
     }
   };
@@ -62,9 +89,16 @@ function updateQRContentWithApiEndpoint(qrContent) {
   };
 }
 
+function attributesToContent(attributes, attributesLabel) {
+  return attributes.map(el => ({
+    label: attributesLabel,
+    attributes: [el],
+  }));
+}
+
 function startDisclosureSession(
   divaSessionId,
-  attribute,
+  attributes,
   attributesLabel,
 ) {
   const callbackUrl = divaConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
@@ -74,12 +108,7 @@ function startDisclosureSession(
     validity: 60,
     timeout: 600,
     request: {
-      content: [
-        {
-          label: attributesLabel,
-          attributes: [attribute],
-        },
-      ],
+      content: attributesToContent(attributes, attributesLabel),
     },
   };
 
@@ -100,7 +129,7 @@ function startDisclosureSession(
     .type('text/plain')
     .send(signedVerificationRequestJwt)
     .then((result) => {
-      irmaState.set(result.body.u, 'PENDING');
+      irmaState[result.body.u] = 'PENDING';
       return {
         irmaSessionId: result.body.u,
         qrContent: updateQRContentWithApiEndpoint(result.body),
@@ -126,59 +155,27 @@ function verifyIrmaApiServerJwt(token) {
 
 function addIrmaProof(proofResult, irmaSessionId) {
   const divaSessionId = proofResult.jti;
-  const divaStateEntry = (divaState.get(divaSessionId) !== undefined)
-    ? divaState.get(divaSessionId)
-    : new Map();
+  const divaStateEntry = (divaState[divaSessionId] !== undefined)
+    ? divaState[divaSessionId]
+    : {};
 
-  divaStateEntry.set(irmaSessionId, proofResult);
-  divaState.set(divaSessionId, divaStateEntry);
+  divaStateEntry[irmaSessionId] = proofResult;
+  divaState[divaSessionId] = divaStateEntry;
 }
 
 function completeDisclosureSession(irmaSessionId, token) {
   return verifyIrmaApiServerJwt(token)
     .then((proofResult) => {
       addIrmaProof(proofResult, irmaSessionId);
-      irmaState.set(irmaSessionId, 'COMPLETED');
+      irmaState[irmaSessionId] = 'COMPLETED';
     });
 }
 
-function mergeAttribute(attributes, attributeName, attributeValue) {
-  if (attributes.get(attributeName) === undefined) {
-    return {
-      ...attributes,
-      attributeName: [attributeValue],
-    };
-  }
-
-  return {
-    ...attributes,
-    attributeName: attributes[attributeName].push(attributeValue),
-  };
-}
-
-function getAttributes(divaSessionId) {
-  if (divaState.get(divaSessionId) === undefined) {
-    return new Map();
-  }
-
-  let attributes = new Map();
-  divaState.get(divaSessionId).forEach((proof) => {
-    if (proof.status === 'VALID') {
-      const attributeMap = proof.attributes;
-      Object.keys(attributeMap).forEach((name) => {
-        attributes = mergeAttribute(attributes, name, attributeMap[name]);
-      });
-    }
-  });
-
-  return attributes;
-}
-
 function getProofs(divaSessionId) {
-  if (divaState.get(divaSessionId) === undefined) {
-    return new Map();
+  if (divaState[divaSessionId] === undefined) {
+    return {};
   }
-  return divaState.get(divaSessionId);
+  return divaState[divaSessionId];
 }
 
 function removeDivaSession(divaSessionId) {
@@ -186,12 +183,12 @@ function removeDivaSession(divaSessionId) {
 }
 
 function getIrmaAPISessionStatus(irmaSessionId) {
-  const irmaStatus = irmaState.get(irmaSessionId);
+  const irmaStatus = irmaState[irmaSessionId];
   return BPromise.resolve(irmaStatus);
 }
 
 function getProofStatus(divaSessionId, irmaSessionId) {
-  const proof = divaState.get(divaSessionId).get(irmaSessionId);
+  const proof = divaState[divaSessionId][irmaSessionId];
   if (!proof || !proof.status) {
     return BPromise.resolve('UNKNOWN');
   }
@@ -205,7 +202,7 @@ function getProofStatus(divaSessionId, irmaSessionId) {
 
 module.exports.version = version;
 module.exports.init = init;
-module.exports.requireAttribute = requireAttribute;
+module.exports.requireAttributes = requireAttributes;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.completeDisclosureSession = completeDisclosureSession;
 module.exports.getAttributes = getAttributes;
