@@ -89,6 +89,13 @@ function updateQRContentWithApiEndpoint(qrContent) {
   };
 }
 
+function attributesToContent(attributes, attributesLabel) {
+  return attributes.map(el => ({
+    label: attributesLabel,
+    attributes: [el],
+  }));
+}
+
 function startDisclosureSession(
   divaSessionId,
   attributes,
@@ -101,12 +108,7 @@ function startDisclosureSession(
     validity: 60,
     timeout: 600,
     request: {
-      content: [
-        {
-          label: attributesLabel,
-          attributes,
-        },
-      ],
+      content: attributesToContent(attributes, attributesLabel),
     },
   };
 
