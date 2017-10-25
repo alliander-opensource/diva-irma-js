@@ -38,7 +38,7 @@ function mergeAttribute(attributes, attributeName, attributeValue) {
     [attributeName]: attributes[attributeName].push(attributeValue),
   } : {
     ...attributes,
-    [attributeName]: attributeValue,
+    [attributeName]: [attributeValue],
   };
 }
 
