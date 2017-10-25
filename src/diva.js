@@ -34,16 +34,10 @@ function init(options) {
 
 function mergeAttribute(attributes, attributeName, attributeValue) {
   if (attributes.get(attributeName) === undefined) {
-    return {
-      ...attributes,
-      attributeName: [attributeValue],
-    };
+    return new Map(attributes).set(attributeName, [attributeValue]);
   }
 
-  return {
-    ...attributes,
-    attributeName: attributes[attributeName].push(attributeValue),
-  };
+  return new Map(attributes).set(attributeName, attributes[attributeName].push(attributeValue));
 }
 
 function getAttributes(divaSessionId) {
@@ -64,16 +58,15 @@ function getAttributes(divaSessionId) {
   return attributes;
 }
 
-function checkAttributes(divaSessionId, requiredAttributes) {
-  const existingAttributes = getAttributes(divaSessionId).keys();
-
-  return requiredAttributes.filter(
-    el => existingAttributes.includes(el)).length === 0;
+function getMissingAttributes(divaSessionId, requiredAttributes) {
+  const existingAttributes = Array.from(getAttributes(divaSessionId).keys());
+  return requiredAttributes.filter(el => !existingAttributes.includes(el));
 }
 
 function requireAttributes(attributes) {
   return (req, res, next) => {
-    if (checkAttributes(req.sessionId, attributes)) {
+    const missingAttributes = getMissingAttributes(req.sessionId, attributes);
+    if (missingAttributes.length === 0) {
       next();
     } else {
       res
@@ -81,7 +74,7 @@ function requireAttributes(attributes) {
         .send({
           success: false,
           requiredAttributes: attributes,
-          message: `You are missing attributes: ${attributes}`,
+          message: `You are missing attributes: [${missingAttributes}]`,
         });
     }
   };
