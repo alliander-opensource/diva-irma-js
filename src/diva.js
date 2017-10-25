@@ -33,13 +33,13 @@ function init(options) {
 }
 
 function mergeAttribute(attributes, attributeName, attributeValue) {
-  const mergedAttributes = attributes;
-  if (attributes[attributeName] === undefined) {
-    mergedAttributes[attributeName] = [attributeValue];
-  } else {
-    mergedAttributes[attributeName] = attributes[attributeName].push(attributeValue);
-  }
-  return mergedAttributes;
+  return attributes[attributeName] ? {
+    ...attributes,
+    [attributeName]: attributes[attributeName].push(attributeValue),
+  } : {
+    ...attributes,
+    [attributeName]: attributeValue,
+  };
 }
 
 function getAttributes(divaSessionId) {
