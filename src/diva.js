@@ -28,8 +28,14 @@ function init(options) {
     ...defaults,
     ...options,
   };
-  divaState = require('./diva-state-mem'); // eslint-disable-line global-require
-  divaState.init();
+
+  if (divaConfig.useRedis) {
+    divaState = require('./diva-state-redis'); // eslint-disable-line global-require
+    divaState.init(divaConfig.redisOptions);
+  } else {
+    divaState = require('./diva-state-mem'); // eslint-disable-line global-require
+    divaState.init();
+  }
 }
 
 function mergeAttribute(attributes, attributeName, attributeValue) {
