@@ -15,7 +15,7 @@ const BPromise = require('bluebird');
 const jwt = require('jsonwebtoken');
 const request = require('superagent');
 
-const defaults = require('./defaults');
+const defaults = require('./default-config');
 const packageJson = require('./../package.json');
 
 function version() {
