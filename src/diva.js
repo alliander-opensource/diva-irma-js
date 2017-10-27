@@ -41,7 +41,7 @@ function init(options) {
 function mergeAttribute(attributes, attributeName, attributeValue) {
   return attributes[attributeName] ? {
     ...attributes,
-    [attributeName]: attributes[attributeName].push(attributeValue),
+    [attributeName]: attributes[attributeName].concat(attributeValue),
   } : {
     ...attributes,
     [attributeName]: [attributeValue],
