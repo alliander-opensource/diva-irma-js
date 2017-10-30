@@ -190,7 +190,45 @@ function removeDivaSession(divaSessionId) {
 }
 
 function getIrmaAPISessionStatus(irmaSessionId) {
-  return divaState.getIrmaEntry(irmaSessionId);
+  const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
+  const getServerStatus = request
+    .get(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint + '/' + irmaSessionId + '/status')
+    .type('text/plain')
+    .then((result) => result.body)
+    .catch((error) => {
+      console.log("ERROR!!");
+      // The IRMA api server returns an error on expired sessions.
+      // For now we treat all errors as expired irma disclosure sessions.
+      return "EXPIRED";
+    });
+
+  return BPromise.all([
+      getDisclosureStatus,
+      getServerStatus
+    ])
+    .spread((disclosureStatus, serverStatus) => {
+      if (disclosureStatus === 'COMPLETED') {
+        const divaSessionId = req.sessionId;
+        return diva.getProofStatus(divaSessionId, irmaSessionId)
+          .then(proofStatus => ({
+            disclosureStatus,
+            proofStatus,
+          }));
+      } else { // Disclosure status is PENDING
+        // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or EXPIRED
+        if (serverStatus === "CANCELLED" || serverStatus === "EXPIRED") {
+          divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+          return {
+            "ABORTED",
+            serverStatus,
+          }
+        }
+        return {
+          disclosureStatus,
+          serverStatus,
+        }
+      }
+    });
 }
 
 function getProofStatus(divaSessionId, irmaSessionId) {
