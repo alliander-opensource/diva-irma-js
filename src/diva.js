@@ -39,13 +39,15 @@ function init(options) {
 }
 
 function mergeAttribute(attributes, attributeName, attributeValue) {
-  return attributes[attributeName] ? {
+  // If an attribute of the same type is already stored, add the
+  // new value. Otherwise, add a new array with the first value.
+  const valuesForAttributeName = attributes[attributeName] ?
+    attributes[attributeName].concat(attributeValue) :
+    [attributeValue];
+  return {
     ...attributes,
-    [attributeName]: attributes[attributeName].concat(attributeValue),
-  } : {
-    ...attributes,
-    [attributeName]: [attributeValue],
-  };
+    [attributeName]: valuesForAttributeName,
+  }
 }
 
 function getAttributes(divaSessionId) {
