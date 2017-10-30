@@ -47,7 +47,7 @@ function mergeAttribute(attributes, attributeName, attributeValue) {
   return {
     ...attributes,
     [attributeName]: valuesForAttributeName,
-  }
+  };
 }
 
 function getAttributes(divaSessionId) {
@@ -203,14 +203,12 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
       return 'NOT_FOUND';
     });
 
-
   return BPromise
     .all([
       getDisclosureStatus,
       getServerStatus,
     ])
     .spread((disclosureStatus, serverStatus) => {
-      console.log(disclosureStatus, serverStatus);
       if (disclosureStatus === 'COMPLETED') {
         return this
           .getProofStatus(divaSessionId, irmaSessionId)
