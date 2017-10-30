@@ -191,17 +191,16 @@ function removeDivaSession(divaSessionId) {
   return divaState.deleteDivaEntry(divaSessionId);
 }
 
-function getIrmaAPISessionStatus(irmaSessionId) {
+function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
   const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
   const getServerStatus = request
     .get(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint + '/' + irmaSessionId + '/status')
     .type('text/plain')
     .then((result) => result.body)
     .catch((error) => {
-      console.log("ERROR!!");
       // The IRMA api server returns an error on expired sessions.
-      // For now we treat all errors as expired irma disclosure sessions.
-      return "EXPIRED";
+      // For now we treat all errors as non-existing irma disclosure sessions.
+      return "NOT_FOUND";
     });
 
   return BPromise.all([
@@ -209,19 +208,20 @@ function getIrmaAPISessionStatus(irmaSessionId) {
       getServerStatus
     ])
     .spread((disclosureStatus, serverStatus) => {
+      console.log(disclosureStatus, serverStatus);
       if (disclosureStatus === 'COMPLETED') {
-        const divaSessionId = req.sessionId;
-        return diva.getProofStatus(divaSessionId, irmaSessionId)
+        return this
+          .getProofStatus(divaSessionId, irmaSessionId)
           .then(proofStatus => ({
             disclosureStatus,
             proofStatus,
           }));
       } else { // Disclosure status is PENDING
-        // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or EXPIRED
-        if (serverStatus === "CANCELLED" || serverStatus === "EXPIRED") {
+        //Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
+        if (serverStatus === "CANCELLED" || serverStatus === "NOT_FOUND") {
           divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
           return {
-            "ABORTED",
+            disclosureStatus: "ABORTED",
             serverStatus,
           }
         }
@@ -238,7 +238,7 @@ function getProofStatus(divaSessionId, irmaSessionId) {
     .then((divaStateEntry) => {
       const proof = divaStateEntry[irmaSessionId];
       if (!proof || !proof.status) {
-        return BPromise.resolve('UNKNOWN');
+        return BPromise.resolve('NO_PROOF_STATUS');
       }
       return BPromise.resolve(proof.status);
     });
