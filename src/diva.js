@@ -194,18 +194,20 @@ function removeDivaSession(divaSessionId) {
 function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
   const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
   const getServerStatus = request
-    .get(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint + '/' + irmaSessionId + '/status')
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${irmaSessionId}/status`)
     .type('text/plain')
-    .then((result) => result.body)
-    .catch((error) => {
+    .then(result => result.body)
+    .catch(() => { // eslint-disable-line arrow-body-style
       // The IRMA api server returns an error on expired sessions.
       // For now we treat all errors as non-existing irma disclosure sessions.
-      return "NOT_FOUND";
+      return 'NOT_FOUND';
     });
 
-  return BPromise.all([
+
+  return BPromise
+    .all([
       getDisclosureStatus,
-      getServerStatus
+      getServerStatus,
     ])
     .spread((disclosureStatus, serverStatus) => {
       console.log(disclosureStatus, serverStatus);
@@ -216,20 +218,20 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
             disclosureStatus,
             proofStatus,
           }));
-      } else { // Disclosure status is PENDING
-        //Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
-        if (serverStatus === "CANCELLED" || serverStatus === "NOT_FOUND") {
-          divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-          return {
-            disclosureStatus: "ABORTED",
-            serverStatus,
-          }
-        }
-        return {
-          disclosureStatus,
-          serverStatus,
-        }
       }
+      // Disclosure status is PENDING
+      // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
+      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+        return {
+          disclosureStatus: 'ABORTED',
+          serverStatus,
+        };
+      }
+      return {
+        disclosureStatus,
+        serverStatus,
+      };
     });
 }
 
