@@ -39,12 +39,14 @@ function init(options) {
 }
 
 function mergeAttribute(attributes, attributeName, attributeValue) {
-  return attributes[attributeName] ? {
+  // If an attribute of the same type is already stored, add the
+  // new value. Otherwise, add a new array with the first value.
+  const valuesForAttributeName = attributes[attributeName] ?
+    attributes[attributeName].concat(attributeValue) :
+    [attributeValue];
+  return {
     ...attributes,
-    [attributeName]: attributes[attributeName].concat(attributeValue),
-  } : {
-    ...attributes,
-    [attributeName]: [attributeValue],
+    [attributeName]: valuesForAttributeName,
   };
 }
 
@@ -189,8 +191,46 @@ function removeDivaSession(divaSessionId) {
   return divaState.deleteDivaEntry(divaSessionId);
 }
 
-function getIrmaAPISessionStatus(irmaSessionId) {
-  return divaState.getIrmaEntry(irmaSessionId);
+function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
+  const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
+  const getServerStatus = request
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${irmaSessionId}/status`)
+    .type('text/plain')
+    .then(result => result.body)
+    .catch(() => { // eslint-disable-line arrow-body-style
+      // The IRMA api server returns an error on expired sessions.
+      // For now we treat all errors as non-existing irma disclosure sessions.
+      return 'NOT_FOUND';
+    });
+
+  return BPromise
+    .all([
+      getDisclosureStatus,
+      getServerStatus,
+    ])
+    .spread((disclosureStatus, serverStatus) => {
+      if (disclosureStatus === 'COMPLETED') {
+        return this
+          .getProofStatus(divaSessionId, irmaSessionId)
+          .then(proofStatus => ({
+            disclosureStatus,
+            proofStatus,
+          }));
+      }
+      // Disclosure status is PENDING
+      // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
+      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+        return {
+          disclosureStatus: 'ABORTED',
+          serverStatus,
+        };
+      }
+      return {
+        disclosureStatus,
+        serverStatus,
+      };
+    });
 }
 
 function getProofStatus(divaSessionId, irmaSessionId) {
@@ -198,7 +238,7 @@ function getProofStatus(divaSessionId, irmaSessionId) {
     .then((divaStateEntry) => {
       const proof = divaStateEntry[irmaSessionId];
       if (!proof || !proof.status) {
-        return BPromise.resolve('UNKNOWN');
+        return BPromise.resolve('NO_PROOF_STATUS');
       }
       return BPromise.resolve(proof.status);
     });
