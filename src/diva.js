@@ -101,18 +101,22 @@ function updateQRContentWithApiEndpoint(qrContent) {
   };
 }
 
-function attributesToContent(attributes, attributesLabel) {
-  return attributes.map(el => ({
-    label: attributesLabel,
-    attributes: [el],
-  }));
+function attributeToContent(attribute, attributeLabel) {
+  return [{
+    label: attributeLabel,
+    attributes: [attribute],
+  }];
 }
 
 function startDisclosureSession(
   divaSessionId,
   attributes,
-  attributesLabel,
+  attributeLabel,
 ) {
+  const content = (typeof attributes === 'string' && typeof attributeLabel === 'string')
+    ? attributeToContent(attributes, attributeLabel)
+    : attributes;
+
   const callbackUrl = divaConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
   const sprequest = {
     callbackUrl,
@@ -120,7 +124,7 @@ function startDisclosureSession(
     validity: 60,
     timeout: 600,
     request: {
-      content: attributesToContent(attributes, attributesLabel),
+      content,
     },
   };
 
