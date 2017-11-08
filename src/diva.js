@@ -220,13 +220,13 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
     .spread((disclosureStatus, serverStatus) => {
       if (serverStatus === 'DONE') {
         return finishIrmaApiProof(irmaSessionId)
-          .then(() => this
-            .getProofStatus(divaSessionId, irmaSessionId)
-            .then(proofStatus => ({
-              disclosureStatus,
-              proofStatus,
-            }),
-            ));
+          .then(() =>
+            this.getProofStatus(divaSessionId, irmaSessionId)
+              .then(proofStatus => ({
+                disclosureStatus,
+                proofStatus,
+              })),
+          );
       }
 
       if (disclosureStatus === 'COMPLETED') {
@@ -273,7 +273,6 @@ module.exports.version = version;
 module.exports.init = init;
 module.exports.requireAttributes = requireAttributes;
 module.exports.startDisclosureSession = startDisclosureSession;
-module.exports.completeDisclosureSession = completeDisclosureSession;
 module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
