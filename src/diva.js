@@ -117,9 +117,7 @@ function startDisclosureSession(
     ? attributeToContent(attributes, attributeLabel)
     : attributes;
 
-  const callbackUrl = divaConfig.baseUrl + divaConfig.completeDisclosureSessionEndpoint;
   const sprequest = {
-    callbackUrl,
     data: divaSessionId,
     validity: 60,
     timeout: 600,
@@ -195,6 +193,13 @@ function removeDivaSession(divaSessionId) {
   return divaState.deleteDivaEntry(divaSessionId);
 }
 
+function finishIrmaApiProof(irmaSessionId) {
+  return request
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${irmaSessionId}/getproof`)
+    .then(result => result.text)
+    .then(proof => completeDisclosureSession(irmaSessionId, proof));
+}
+
 function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
   const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
   const getServerStatus = request
@@ -213,6 +218,17 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
       getServerStatus,
     ])
     .spread((disclosureStatus, serverStatus) => {
+      if (serverStatus === 'DONE') {
+        return finishIrmaApiProof(irmaSessionId)
+          .then(() => this
+            .getProofStatus(divaSessionId, irmaSessionId)
+            .then(proofStatus => ({
+              disclosureStatus,
+              proofStatus,
+            }),
+            ));
+      }
+
       if (disclosureStatus === 'COMPLETED') {
         return this
           .getProofStatus(divaSessionId, irmaSessionId)
