@@ -250,7 +250,7 @@ function completeSignatureSession(irmaSessionId, token) {
     .then((signatureResult) => {
       divaState.setIrmaEntry(irmaSessionId, 'COMPLETED'); // Async
       const { attributes, message, status } = signatureResult;
-      return { jwt: token, attributes, message, status };
+      return { jwt: token, attributes, message, proofStatus: status };
     });
 }
 
@@ -287,21 +287,21 @@ function getIrmaSignatureStatus(irmaSessionId) {
       // For now we treat all errors as non-existing irma disclosure sessions.
       return 'NOT_FOUND';
     })
-    .then((signatureStatus) => {
-      if (signatureStatus === 'DONE') {
+    .then((serverStatus) => {
+      if (serverStatus === 'DONE') {
         return getSignatureFromApiServer(irmaSessionId)
           .then(signature => ({
-            status: signatureStatus,
-            signature,
+            serverStatus,
+            ...signature,
           }));
       }
 
-      if (signatureStatus === 'CANCELLED' || signatureStatus === 'NOT_FOUND') {
-        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-      }
+      // if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+      //   divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+      // }
 
       // Pending
-      return { status: signatureStatus };
+      return { serverStatus };
     });
 }
 
