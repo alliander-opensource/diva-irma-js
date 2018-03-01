@@ -277,8 +277,8 @@ function getSignatureFromApiServer(irmaSessionId) {
 }
 
 function getIrmaSignatureStatus(irmaSessionId) {
-  // Get server status
-  return request
+  const getSignatureStatus = divaState.getIrmaEntry(irmaSessionId);
+  const getServerStatus = request
     .get(`${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${irmaSessionId}/status`)
     .type('text/plain')
     .then(result => result.body)
@@ -286,22 +286,41 @@ function getIrmaSignatureStatus(irmaSessionId) {
       // The IRMA api server returns an error on expired sessions.
       // For now we treat all errors as non-existing irma disclosure sessions.
       return 'NOT_FOUND';
-    })
-    .then((serverStatus) => {
+    });
+
+  return BPromise
+    .all([
+      getSignatureStatus,
+      getServerStatus,
+    ])
+    .spread((signatureStatus, serverStatus) => {
       if (serverStatus === 'DONE') {
         return getSignatureFromApiServer(irmaSessionId)
           .then(signature => ({
+            signatureStatus: 'COMPLETED',
             serverStatus,
             ...signature,
           }));
       }
 
-      // if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
-      //   divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-      // }
+      // This is for when we poll again
+      // TODO: does this work?
+      if (signatureStatus === 'COMPLETED') {
+        return {
+          signatureStatus,
+        };
+      }
+
+      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+        return {
+          signatureStatus: 'ABORTED',
+          serverStatus,
+        };
+      }
 
       // Pending
-      return { serverStatus };
+      return { signatureStatus, serverStatus };
     });
 }
 
@@ -330,15 +349,12 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
               .then(proofStatus => ({
                 disclosureStatus,
                 proofStatus,
+                serverStatus, // TODO: investigate
               })),
           );
       }
 
-      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
-        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-        return serverStatus;
-      }
-
+      // This is for when we poll again
       if (disclosureStatus === 'COMPLETED') {
         return this
           .getProofStatus(divaSessionId, irmaSessionId)
@@ -347,6 +363,7 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
             proofStatus,
           }));
       }
+
       // Disclosure status is PENDING
       // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
       if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
@@ -356,6 +373,8 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
           serverStatus,
         };
       }
+
+      // Default case, still waiting for proof
       return {
         disclosureStatus,
         serverStatus,
@@ -367,7 +386,6 @@ function getProofStatus(divaSessionId, irmaSessionId) {
   return divaState.getDivaEntry(divaSessionId)
     .then((divaStateEntry) => {
       const proof = divaStateEntry[irmaSessionId];
-      console.log(proof);
       if (!proof || !proof.status) {
         return BPromise.resolve('NO_PROOF_STATUS');
       }
