@@ -94,16 +94,10 @@ function requireAttributes(attributes) {
   };
 }
 
-function updateQRContentWithApiEndpoint(qrContent, isSig) {
-  if (isSig) {
-    return {
-      ...qrContent,
-      u: `${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${qrContent.u}`,
-    };
-  }
+function updateQRContentWithApiEndpoint(qrContent, endpoint) {
   return {
     ...qrContent,
-    u: `${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${qrContent.u}`,
+    u: `${divaConfig.irmaApiServerUrl}${endpoint}/${qrContent.u}`,
   };
 }
 
@@ -148,7 +142,7 @@ function startDisclosureSession(
       divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
       return {
         irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body),
+        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.verificationEndpoint),
       };
     })
     .catch((error) => {
@@ -195,12 +189,59 @@ function startSignatureSession(
       divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
       return {
         irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body, true),
+        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.signatureEndpoint),
       };
     })
     .catch((error) => {
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA signature session: ${error.message}`);
+      throw e;
+    });
+}
+
+/**
+ * Start an issuance session.
+ * @param {*} credentials Array of the credentials to be issued. See
+ * https://credentials.github.io/protocols/irma-protocol/#issuing for the format. Note that if
+ * the validity of the credentials is not a multiple of 60*60*24*7 = 604800, the API server may
+ * reject the issuance request, or it may accept it but floor it, depending on its configuration.
+ * @returns {Promise<json>} Session token and content of IRMA QR
+ */
+function startIssueSession(credentials) {
+  const iprequest = {
+    validity: 600,
+    timeout: 600,
+    request: {
+      credentials,
+    },
+  };
+
+  const jwtOptions = {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'issue_request',
+  };
+
+  const signedIssueRequestJwt = jwt.sign(
+    { iprequest },
+    divaConfig.apiKey,
+    jwtOptions,
+  );
+
+  return request
+    .post(divaConfig.irmaApiServerUrl + divaConfig.issueEndpoint)
+    .type('text/plain')
+    .send(signedIssueRequestJwt)
+    .then((result) => {
+      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
+      return {
+        irmaSessionId: result.body.u,
+        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.issueEndpoint),
+      };
+    })
+    .catch((error) => {
+      // TODO: make this a typed error
+      const e = new Error(`Error starting IRMA issue session: ${error.message}`);
       throw e;
     });
 }
@@ -401,6 +442,7 @@ module.exports.init = init;
 module.exports.requireAttributes = requireAttributes;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
+module.exports.startIssueSession = startIssueSession;
 module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;

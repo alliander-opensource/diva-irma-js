@@ -1,6 +1,7 @@
 const defaults = {
   verificationEndpoint: '/api/v2/verification',
   signatureEndpoint: '/api/v2/signature',
+  issueEndpoint: '/api/v2/issue',
   jwtIrmaApiServerVerifyOptions: {
     algorithm: 'RS256',
     subject: 'disclosure_result',
