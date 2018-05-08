@@ -132,11 +132,7 @@ function startDisclosureSession(
     },
   };
 
-  const jwtOptions = {
-    algorithm: 'RS256',
-    issuer: 'diva',
-    subject: 'verification_request',
-  };
+  const jwtOptions = divaConfig.jwtDisclosureRequestOptions;
 
   const signedVerificationRequestJwt = jwt.sign(
     { sprequest },
@@ -158,7 +154,7 @@ function startDisclosureSession(
     .catch((error) => {
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA session: ${error.message}`);
-      return e;
+      throw e;
     });
 }
 
@@ -181,11 +177,7 @@ function startSignatureSession(
     },
   };
 
-  const jwtOptions = {
-    algorithm: 'RS256',
-    issuer: 'diva',
-    subject: 'signature_request',
-  };
+  const jwtOptions = divaConfig.jwtSignatureRequestOptions;
 
   const signedSignatureRequestJwt = jwt.sign(
     { absrequest },
