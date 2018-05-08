@@ -153,6 +153,9 @@ function startDisclosureSession(
     })
     .catch((error) => {
       // TODO: make this a typed error
+      if (error.status === 404) {
+        console.log(`Could not find API server endpoint at ${divaConfig.irmaApiServerUrl}${ divaConfig.verificationEndpoint}`); //TODO proper debugging
+      }
       const e = new Error(`Error starting IRMA session: ${error.message}`);
       throw e;
     });
