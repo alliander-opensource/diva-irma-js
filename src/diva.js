@@ -216,11 +216,7 @@ function startIssueSession(credentials) {
     },
   };
 
-  const jwtOptions = {
-    algorithm: 'RS256',
-    issuer: 'diva',
-    subject: 'issue_request',
-  };
+  const jwtOptions = divaConfig.jwtIssueRequestOptions;
 
   const signedIssueRequestJwt = jwt.sign(
     { iprequest },

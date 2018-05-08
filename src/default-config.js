@@ -20,6 +20,11 @@ const defaults = {
     issuer: 'diva',
     subject: 'signature_request',
   },
+  jwtIssueRequestOptions: {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'signature_request',
+  },
   useRedis: false,
   redisOptions: {
     host: '127.0.0.1',
