@@ -94,7 +94,13 @@ function requireAttributes(attributes) {
   };
 }
 
-function updateQRContentWithApiEndpoint(qrContent) {
+function updateQRContentWithApiEndpoint(qrContent, isSig) {
+  if (isSig) {
+    return {
+      ...qrContent,
+      u: `${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${qrContent.u}`,
+    };
+  }
   return {
     ...qrContent,
     u: `${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${qrContent.u}`,
@@ -156,6 +162,55 @@ function startDisclosureSession(
     });
 }
 
+function startSignatureSession(
+  attributes,
+  attributeLabel,
+  message,
+) {
+  const content = (typeof attributes === 'string' && typeof attributeLabel === 'string')
+    ? attributeToContent(attributes, attributeLabel)
+    : attributes;
+
+  const absrequest = {
+    validity: 60,
+    timeout: 600,
+    request: {
+      message,
+      messageType: 'STRING',
+      content,
+    },
+  };
+
+  const jwtOptions = {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'signature_request',
+  };
+
+  const signedSignatureRequestJwt = jwt.sign(
+    { absrequest },
+    divaConfig.apiKey,
+    jwtOptions,
+  );
+
+  return request
+    .post(divaConfig.irmaApiServerUrl + divaConfig.signatureEndpoint)
+    .type('text/plain')
+    .send(signedSignatureRequestJwt)
+    .then((result) => {
+      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
+      return {
+        irmaSessionId: result.body.u,
+        qrContent: updateQRContentWithApiEndpoint(result.body, true),
+      };
+    })
+    .catch((error) => {
+      // TODO: make this a typed error
+      const e = new Error(`Error starting IRMA signature session: ${error.message}`);
+      throw e;
+    });
+}
+
 /**
  * Decode and verify JWT verify token from api server and check validity/signature
  * @function verifyIrmaJwt
@@ -165,6 +220,11 @@ function startDisclosureSession(
 function verifyIrmaApiServerJwt(token) {
   const key = divaConfig.irmaApiServerPublicKey;
   return BPromise.try(() => jwt.verify(token, key, divaConfig.jwtIrmaApiServerVerifyOptions));
+}
+
+function verifyIrmaApiServerSignature(token) {
+  const key = divaConfig.irmaApiServerPublicKey;
+  return BPromise.try(() => jwt.verify(token, key, divaConfig.jwtIrmaApiServerSignatureOptions));
 }
 
 function addIrmaProof(proofResult, irmaSessionId) {
@@ -185,6 +245,15 @@ function completeDisclosureSession(irmaSessionId, token) {
     .then(() => divaState.setIrmaEntry(irmaSessionId, 'COMPLETED'));
 }
 
+function completeSignatureSession(irmaSessionId, token) {
+  return verifyIrmaApiServerSignature(token)
+    .then((signatureResult) => {
+      divaState.setIrmaEntry(irmaSessionId, 'COMPLETED'); // Async
+      const { attributes, message, status } = signatureResult;
+      return { jwt: token, attributes, message, proofStatus: status };
+    });
+}
+
 function getProofs(divaSessionId) {
   return divaState.getDivaEntry(divaSessionId);
 }
@@ -198,6 +267,61 @@ function finishIrmaApiProof(irmaSessionId) {
     .get(`${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${irmaSessionId}/getproof`)
     .then(result => result.text)
     .then(proof => completeDisclosureSession(irmaSessionId, proof));
+}
+
+function getSignatureFromApiServer(irmaSessionId) {
+  return request
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${irmaSessionId}/getsignature`)
+    .then(result => result.text)
+    .then(signature => completeSignatureSession(irmaSessionId, signature));
+}
+
+function getIrmaSignatureStatus(irmaSessionId) {
+  const getSignatureStatus = divaState.getIrmaEntry(irmaSessionId);
+  const getServerStatus = request
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${irmaSessionId}/status`)
+    .type('text/plain')
+    .then(result => result.body)
+    .catch(() => { // eslint-disable-line arrow-body-style
+      // The IRMA api server returns an error on expired sessions.
+      // For now we treat all errors as non-existing irma disclosure sessions.
+      return 'NOT_FOUND';
+    });
+
+  return BPromise
+    .all([
+      getSignatureStatus,
+      getServerStatus,
+    ])
+    .spread((signatureStatus, serverStatus) => {
+      if (serverStatus === 'DONE') {
+        return getSignatureFromApiServer(irmaSessionId)
+          .then(signature => ({
+            signatureStatus: 'COMPLETED',
+            serverStatus,
+            ...signature,
+          }));
+      }
+
+      // This is for when we poll again
+      // TODO: does this work?
+      if (signatureStatus === 'COMPLETED') {
+        return {
+          signatureStatus,
+        };
+      }
+
+      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+        return {
+          signatureStatus: 'ABORTED',
+          serverStatus,
+        };
+      }
+
+      // Pending
+      return { signatureStatus, serverStatus };
+    });
 }
 
 function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
@@ -225,10 +349,12 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
               .then(proofStatus => ({
                 disclosureStatus,
                 proofStatus,
+                serverStatus, // TODO: investigate
               })),
           );
       }
 
+      // This is for when we poll again
       if (disclosureStatus === 'COMPLETED') {
         return this
           .getProofStatus(divaSessionId, irmaSessionId)
@@ -237,6 +363,7 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
             proofStatus,
           }));
       }
+
       // Disclosure status is PENDING
       // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
       if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
@@ -246,6 +373,8 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
           serverStatus,
         };
       }
+
+      // Default case, still waiting for proof
       return {
         disclosureStatus,
         serverStatus,
@@ -273,8 +402,10 @@ module.exports.version = version;
 module.exports.init = init;
 module.exports.requireAttributes = requireAttributes;
 module.exports.startDisclosureSession = startDisclosureSession;
+module.exports.startSignatureSession = startSignatureSession;
 module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
 module.exports.getIrmaAPISessionStatus = getIrmaAPISessionStatus;
+module.exports.getIrmaSignatureStatus = getIrmaSignatureStatus;
 module.exports.getProofStatus = getProofStatus;
