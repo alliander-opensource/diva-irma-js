@@ -23,7 +23,7 @@ const defaults = {
   jwtIssueRequestOptions: {
     algorithm: 'RS256',
     issuer: 'diva',
-    subject: 'signature_request',
+    subject: 'issue_request',
   },
   useRedis: false,
   redisOptions: {
