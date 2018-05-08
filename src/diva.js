@@ -359,6 +359,10 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
       // Disclosure status is PENDING
       // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
       if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        // We set local state to ABORTED because when the IRMA API SERVER is not aware
+        // of this irmaSession, and we don't have any record locally (which we check by
+        // checking for COMPLETED above), we don't have any other option than setting
+        // local state to ABORTED.
         divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
         return {
           disclosureStatus: 'ABORTED',
