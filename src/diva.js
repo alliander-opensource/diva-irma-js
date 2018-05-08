@@ -359,6 +359,49 @@ function getIrmaSignatureStatus(irmaSessionId) {
     });
 }
 
+function getIrmaIssueStatus(irmaSessionId) {
+  const getIssueStatus = divaState.getIrmaEntry(irmaSessionId);
+  const getServerStatus = request
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.issueEndpoint}/${irmaSessionId}/status`)
+    .type('text/plain')
+    .then(result => result.body)
+    .catch(() => { // eslint-disable-line arrow-body-style
+      // The IRMA api server returns an error on expired sessions.
+      // For now we treat all errors as non-existing irma disclosure sessions.
+      return 'NOT_FOUND';
+    });
+
+  // Issuance sessions are easier than disclosure or signing sessions, as we don't have to retrieve
+  // a proof or signature at the end of the session.
+  return BPromise
+    .all([
+      getIssueStatus,
+      getServerStatus,
+    ])
+    .spread((issueStatus, serverStatus) => {
+      if (serverStatus === 'DONE') {
+        return {
+          issueStatus: 'COMPLETED',
+          serverStatus,
+        }
+      }
+
+      // Issuance status is PENDING
+      // Set issueStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
+      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+        return {
+          issueStatus: 'ABORTED',
+          serverStatus,
+        };
+      }
+      return {
+        issueStatus,
+        serverStatus,
+      };
+    });
+}
+
 function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
   const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
   const getServerStatus = request
@@ -448,4 +491,5 @@ module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
 module.exports.getIrmaAPISessionStatus = getIrmaAPISessionStatus;
 module.exports.getIrmaSignatureStatus = getIrmaSignatureStatus;
+module.exports.getIrmaIssueStatus = getIrmaIssueStatus;
 module.exports.getProofStatus = getProofStatus;
