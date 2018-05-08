@@ -132,11 +132,7 @@ function startDisclosureSession(
     },
   };
 
-  const jwtOptions = {
-    algorithm: 'RS256',
-    issuer: 'diva',
-    subject: 'verification_request',
-  };
+  const jwtOptions = divaConfig.jwtDisclosureRequestOptions;
 
   const signedVerificationRequestJwt = jwt.sign(
     { sprequest },
@@ -157,8 +153,10 @@ function startDisclosureSession(
     })
     .catch((error) => {
       // TODO: make this a typed error
-      const e = new Error(`Error starting IRMA session: ${error.message}`);
-      return e;
+      if (error.status === 404) {
+        throw new Error(`Could not find API server endpoint at ${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}`); // TODO proper debugging
+      }
+      throw new Error(`Error starting IRMA session: ${error.message}`);
     });
 }
 
@@ -181,11 +179,7 @@ function startSignatureSession(
     },
   };
 
-  const jwtOptions = {
-    algorithm: 'RS256',
-    issuer: 'diva',
-    subject: 'signature_request',
-  };
+  const jwtOptions = divaConfig.jwtSignatureRequestOptions;
 
   const signedSignatureRequestJwt = jwt.sign(
     { absrequest },
@@ -367,6 +361,10 @@ function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
       // Disclosure status is PENDING
       // Set disclosureStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
       if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        // We set local state to ABORTED because when the IRMA API SERVER is not aware
+        // of this irmaSession, and we don't have any record locally (which we check by
+        // checking for COMPLETED above), we don't have any other option than setting
+        // local state to ABORTED.
         divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
         return {
           disclosureStatus: 'ABORTED',

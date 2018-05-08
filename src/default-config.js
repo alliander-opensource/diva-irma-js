@@ -9,6 +9,16 @@ const defaults = {
     algorithm: 'RS256',
     subject: 'abs_result',
   },
+  jwtDisclosureRequestOptions: {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'verification_request',
+  },
+  jwtSignatureRequestOptions: {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'signature_request',
+  },
   useRedis: false,
   redisOptions: {
     host: '127.0.0.1',
