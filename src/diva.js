@@ -379,7 +379,7 @@ function getIrmaIssueStatus(irmaSessionId) {
         return {
           issueStatus: 'COMPLETED',
           serverStatus,
-        }
+        };
       }
 
       // Issuance status is PENDING
