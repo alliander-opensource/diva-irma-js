@@ -1,6 +1,7 @@
 const defaults = {
   verificationEndpoint: '/api/v2/verification',
   signatureEndpoint: '/api/v2/signature',
+  issueEndpoint: '/api/v2/issue',
   jwtIrmaApiServerVerifyOptions: {
     algorithm: 'RS256',
     subject: 'disclosure_result',
@@ -18,6 +19,11 @@ const defaults = {
     algorithm: 'RS256',
     issuer: 'diva',
     subject: 'signature_request',
+  },
+  jwtIssueRequestOptions: {
+    algorithm: 'RS256',
+    issuer: 'diva',
+    subject: 'issue_request',
   },
   useRedis: false,
   redisOptions: {

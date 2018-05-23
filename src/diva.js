@@ -94,16 +94,10 @@ function requireAttributes(attributes) {
   };
 }
 
-function updateQRContentWithApiEndpoint(qrContent, isSig) {
-  if (isSig) {
-    return {
-      ...qrContent,
-      u: `${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${qrContent.u}`,
-    };
-  }
+function updateQRContentWithApiEndpoint(qrContent, endpoint) {
   return {
     ...qrContent,
-    u: `${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${qrContent.u}`,
+    u: `${divaConfig.irmaApiServerUrl}${endpoint}/${qrContent.u}`,
   };
 }
 
@@ -148,7 +142,7 @@ function startDisclosureSession(
       divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
       return {
         irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body),
+        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.verificationEndpoint),
       };
     })
     .catch((error) => {
@@ -195,12 +189,55 @@ function startSignatureSession(
       divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
       return {
         irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body, true),
+        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.signatureEndpoint),
       };
     })
     .catch((error) => {
       // TODO: make this a typed error
       const e = new Error(`Error starting IRMA signature session: ${error.message}`);
+      throw e;
+    });
+}
+
+/**
+ * Start an issuance session.
+ * @param {*} credentials Array of the credentials to be issued. See
+ * https://credentials.github.io/protocols/irma-protocol/#issuing for the format. Note that if
+ * the validity of the credentials is not a multiple of 60*60*24*7 = 604800, the API server may
+ * reject the issuance request, or it may accept it but floor it, depending on its configuration.
+ * @returns {Promise<json>} Session token and content of IRMA QR
+ */
+function startIssueSession(credentials) {
+  const iprequest = {
+    validity: 600,
+    timeout: 600,
+    request: {
+      credentials,
+    },
+  };
+
+  const jwtOptions = divaConfig.jwtIssueRequestOptions;
+
+  const signedIssueRequestJwt = jwt.sign(
+    { iprequest },
+    divaConfig.apiKey,
+    jwtOptions,
+  );
+
+  return request
+    .post(divaConfig.irmaApiServerUrl + divaConfig.issueEndpoint)
+    .type('text/plain')
+    .send(signedIssueRequestJwt)
+    .then((result) => {
+      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
+      return {
+        irmaSessionId: result.body.u,
+        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.issueEndpoint),
+      };
+    })
+    .catch((error) => {
+      // TODO: make this a typed error
+      const e = new Error(`Error starting IRMA issue session: ${error.message}`);
       throw e;
     });
 }
@@ -318,6 +355,49 @@ function getIrmaSignatureStatus(irmaSessionId) {
     });
 }
 
+function getIrmaIssueStatus(irmaSessionId) {
+  const getIssueStatus = divaState.getIrmaEntry(irmaSessionId);
+  const getServerStatus = request
+    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.issueEndpoint}/${irmaSessionId}/status`)
+    .type('text/plain')
+    .then(result => result.body)
+    .catch(() => { // eslint-disable-line arrow-body-style
+      // The IRMA api server returns an error on expired sessions.
+      // For now we treat all errors as non-existing irma disclosure sessions.
+      return 'NOT_FOUND';
+    });
+
+  // Issuance sessions are easier than disclosure or signing sessions, as we don't have to retrieve
+  // a proof or signature at the end of the session.
+  return BPromise
+    .all([
+      getIssueStatus,
+      getServerStatus,
+    ])
+    .spread((issueStatus, serverStatus) => {
+      if (serverStatus === 'DONE') {
+        return {
+          issueStatus: 'COMPLETED',
+          serverStatus,
+        };
+      }
+
+      // Issuance status is PENDING
+      // Set issueStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
+      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
+        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+        return {
+          issueStatus: 'ABORTED',
+          serverStatus,
+        };
+      }
+      return {
+        issueStatus,
+        serverStatus,
+      };
+    });
+}
+
 function getIrmaAPISessionStatus(divaSessionId, irmaSessionId) {
   const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
   const getServerStatus = request
@@ -401,9 +481,11 @@ module.exports.init = init;
 module.exports.requireAttributes = requireAttributes;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
+module.exports.startIssueSession = startIssueSession;
 module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
 module.exports.getIrmaAPISessionStatus = getIrmaAPISessionStatus;
 module.exports.getIrmaSignatureStatus = getIrmaSignatureStatus;
+module.exports.getIrmaIssueStatus = getIrmaIssueStatus;
 module.exports.getProofStatus = getProofStatus;
