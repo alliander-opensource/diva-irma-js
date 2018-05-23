@@ -108,6 +108,31 @@ function attributeToContent(attribute, attributeLabel) {
   }];
 }
 
+/**
+ * Start a new IRMA session: request session token, save it and return it
+ * @param {String} endpoint URL endpoint of IRMA Api Server (without base url)
+ * @param {String} jwtBody Encoded JWT containing issue, disclosure or signing request
+ * @returns {Promise<json>} Session token and content of IRMA QR
+ */
+function requestIrmaSession(endpoint, jwtBody) {
+  return request
+    .post(divaConfig.irmaApiServerUrl + endpoint)
+    .type('text/plain')
+    .send(jwtBody)
+    .then((result) => {
+      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
+      return {
+        irmaSessionId: result.body.u,
+        qrContent: updateQRContentWithApiEndpoint(result.body, endpoint),
+      };
+    })
+    .catch((error) => {
+      // TODO: make this a typed error
+      const e = new Error(`Error starting IRMA session: ${error.message}`);
+      throw e;
+    });
+}
+
 function startDisclosureSession(
   divaSessionId,
   attributes,
@@ -134,24 +159,7 @@ function startDisclosureSession(
     jwtOptions,
   );
 
-  return request
-    .post(divaConfig.irmaApiServerUrl + divaConfig.verificationEndpoint)
-    .type('text/plain')
-    .send(signedVerificationRequestJwt)
-    .then((result) => {
-      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
-      return {
-        irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.verificationEndpoint),
-      };
-    })
-    .catch((error) => {
-      // TODO: make this a typed error
-      if (error.status === 404) {
-        throw new Error(`Could not find API server endpoint at ${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}`); // TODO proper debugging
-      }
-      throw new Error(`Error starting IRMA session: ${error.message}`);
-    });
+  return requestIrmaSession(divaConfig.verificationEndpoint, signedVerificationRequestJwt);
 }
 
 function startSignatureSession(
@@ -181,22 +189,7 @@ function startSignatureSession(
     jwtOptions,
   );
 
-  return request
-    .post(divaConfig.irmaApiServerUrl + divaConfig.signatureEndpoint)
-    .type('text/plain')
-    .send(signedSignatureRequestJwt)
-    .then((result) => {
-      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
-      return {
-        irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.signatureEndpoint),
-      };
-    })
-    .catch((error) => {
-      // TODO: make this a typed error
-      const e = new Error(`Error starting IRMA signature session: ${error.message}`);
-      throw e;
-    });
+  return requestIrmaSession(divaConfig.signatureEndpoint, signedSignatureRequestJwt);
 }
 
 /**
@@ -224,22 +217,7 @@ function startIssueSession(credentials) {
     jwtOptions,
   );
 
-  return request
-    .post(divaConfig.irmaApiServerUrl + divaConfig.issueEndpoint)
-    .type('text/plain')
-    .send(signedIssueRequestJwt)
-    .then((result) => {
-      divaState.setIrmaEntry(result.body.u, 'PENDING'); // Async
-      return {
-        irmaSessionId: result.body.u,
-        qrContent: updateQRContentWithApiEndpoint(result.body, divaConfig.issueEndpoint),
-      };
-    })
-    .catch((error) => {
-      // TODO: make this a typed error
-      const e = new Error(`Error starting IRMA issue session: ${error.message}`);
-      throw e;
-    });
+  return requestIrmaSession(divaConfig.issueEndpoint, signedIssueRequestJwt);
 }
 
 /**
