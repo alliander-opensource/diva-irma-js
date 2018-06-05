@@ -133,14 +133,24 @@ function requestIrmaSession(endpoint, jwtBody) {
     });
 }
 
+/**
+ * Generate a content array that can be used in either disclosure of signature request
+ * @param {String/Object} attribute identitifier to be disclosed or content object
+ * @param {String/Undefined} label used with attribute identifier (only if no content object)
+ * @returns {Array<Object>} list of attribute disjunctions
+ */
+function generateDisclosureContent(attributes, attributeLabel) {
+  return (typeof attributes === 'string' && typeof attributeLabel === 'string')
+    ? attributeToContent(attributes, attributeLabel)
+    : attributes;
+}
+
 function startDisclosureSession(
   divaSessionId,
   attributes,
   attributeLabel,
 ) {
-  const content = (typeof attributes === 'string' && typeof attributeLabel === 'string')
-    ? attributeToContent(attributes, attributeLabel)
-    : attributes;
+  const content = generateDisclosureContent(attributes, attributeLabel);
 
   const sprequest = {
     data: divaSessionId,
@@ -167,9 +177,7 @@ function startSignatureSession(
   attributeLabel,
   message,
 ) {
-  const content = (typeof attributes === 'string' && typeof attributeLabel === 'string')
-    ? attributeToContent(attributes, attributeLabel)
-    : attributes;
+  const content = generateDisclosureContent(attributes, attributeLabel);
 
   const absrequest = {
     validity: 60,
@@ -200,15 +208,19 @@ function startSignatureSession(
  * reject the issuance request, or it may accept it but floor it, depending on its configuration.
  * @returns {Promise<json>} Session token and content of IRMA QR
  */
-function startIssueSession(credentials) {
+function startIssueSession(credentials, attributes, attributeLabel) {
+  const disclose = (attributes !== undefined)
+    ? generateDisclosureContent(attributes, attributeLabel)
+    : null;
+
   const iprequest = {
     validity: 600,
     timeout: 600,
     request: {
       credentials,
+      disclose,
     },
   };
-
   const jwtOptions = divaConfig.jwtIssueRequestOptions;
 
   const signedIssueRequestJwt = jwt.sign(
