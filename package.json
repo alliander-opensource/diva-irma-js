@@ -2,9 +2,9 @@
   "name": "diva-irma-js",
   "version": "1.0.0",
   "description": "An SDK to easily integrate IRMA (https://privacybydesign.foundation/irma/) into NodeJS based apps.",
-  "main": "src/diva.js",
+  "main": "diva-irma.js",
   "scripts": {
-    "lint": "./node_modules/.bin/eslint -c .eslintrc src",
+    "lint": "./node_modules/.bin/eslint -c .eslintrc *.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
