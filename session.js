@@ -44,6 +44,14 @@ function getAttributes(divaSessionId) {
     });
 }
 
+function getMissingAttributes(divaSessionId, requiredAttributes) {
+  return getAttributes(divaSessionId)
+    .then((attributes) => {
+      const existingAttributes = Object.keys(attributes);
+      return requiredAttributes.filter(el => !existingAttributes.includes(el));
+    });
+}
+
 function addIrmaProofToSession(proofResult, irmaSessionId) {
   const divaSessionId = proofResult.jti;
 
@@ -75,6 +83,15 @@ function getProofStatus(divaSessionId, irmaSessionId) {
     });
 }
 
+function requireAttributes(sessionId, attributes) {
+  return getMissingAttributes(sessionId, attributes)
+    .then((missingAttributes) => {
+      if (missingAttributes.length !== 0) {
+        throw new Error(`You are missing attributes: [${missingAttributes}]`);
+      }
+    });
+}
+
 function init(divaStateOptions) {
   divaState = divaStateModule.init(divaStateOptions);
 }
@@ -90,3 +107,5 @@ module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
 module.exports.getProofStatus = getProofStatus;
 module.exports.addIrmaProofToSession = addIrmaProofToSession;
+module.exports.requireAttributes = requireAttributes;
+module.exports.getMissingAttributes = getMissingAttributes;

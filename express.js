@@ -9,17 +9,9 @@
 * @private
 */
 
-function getMissingAttributes(divaSession, divaSessionId, requiredAttributes) {
-  return divaSession.getAttributes(divaSessionId)
-    .then((attributes) => {
-      const existingAttributes = Object.keys(attributes);
-      return requiredAttributes.filter(el => !existingAttributes.includes(el));
-    });
-}
-
 function requireAttributes(divaSession, attributes) {
   return (req, res, next) => {
-    getMissingAttributes(divaSession, req.sessionId, attributes)
+    divaSession.getMissingAttributes(req.sessionId, attributes)
       .then((missingAttributes) => {
         if (missingAttributes.length === 0) {
           next();
