@@ -11,13 +11,18 @@
 
 const defaults = require('../config/default-config');
 
-module.exports = function init(options) {
+let divaState;
+
+function init(options) {
+  // Don't init again if we have already in other function
+  if (divaState !== undefined) {
+    return divaState;
+  }
+
   const divaConfig = {
     ...defaults,
     ...options,
   };
-
-  let divaState;
 
   if (divaConfig.useRedis) {
     divaState = require('./diva-state-redis'); // eslint-disable-line global-require
@@ -29,3 +34,10 @@ module.exports = function init(options) {
 
   return divaState;
 };
+
+/**
+* Module exports.
+* @public
+*/
+module.exports = init;
+module.exports.init = init;

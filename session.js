@@ -4,6 +4,8 @@
  * BSD 3-Clause License
  */
 
+const divaStateModule = require('./diva-state');
+
 let divaState;
 
 /**
@@ -73,28 +75,16 @@ function getProofStatus(divaSessionId, irmaSessionId) {
     });
 }
 
+function init(divaStateOptions) {
+  divaState = divaStateModule.init(divaStateOptions);
+}
+
 /**
 * Module exports.
 * @public
 */
-module.exports = function init(state) {
-  if (state === undefined) {
-    throw new Error('You must call this module with a state object, see documentation');
-  }
-
-  divaState = state;
-
-  return {
-    getAttributes,
-    getProofs,
-    removeDivaSession,
-    getProofStatus,
-    addIrmaProofToSession,
-  };
-};
-
-// TODO: import check via wrapper file?
-
+module.exports = init;
+module.exports.init = init;
 module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;

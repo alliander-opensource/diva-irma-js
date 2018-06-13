@@ -4,14 +4,12 @@
  * BSD 3-Clause License
  */
 
-let divaSession;
-
 /**
 * Module dependencies.
 * @private
 */
 
-function getMissingAttributes(divaSessionId, requiredAttributes) {
+function getMissingAttributes(divaSession, divaSessionId, requiredAttributes) {
   return divaSession.getAttributes(divaSessionId)
     .then((attributes) => {
       const existingAttributes = Object.keys(attributes);
@@ -19,9 +17,9 @@ function getMissingAttributes(divaSessionId, requiredAttributes) {
     });
 }
 
-function requireAttributes(attributes) {
+function requireAttributes(divaSession, attributes) {
   return (req, res, next) => {
-    getMissingAttributes(req.sessionId, attributes)
+    getMissingAttributes(divaSession, req.sessionId, attributes)
       .then((missingAttributes) => {
         if (missingAttributes.length === 0) {
           next();
@@ -42,18 +40,4 @@ function requireAttributes(attributes) {
 * Module exports.
 * @public
 */
-module.exports = function init(state) {
-  if (state === undefined) {
-    throw new Error('You must call this module with a state object, see documentation');
-  }
-
-  divaSession = require('./session')(state); // eslint-disable-line global-require
-
-  return {
-    requireAttributes,
-  };
-};
-
-// TODO: import check via wrapper file?
-
 module.exports.requireAttributes = requireAttributes;

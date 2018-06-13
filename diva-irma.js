@@ -5,6 +5,8 @@
  * BSD 3-Clause License
  */
 
+const divaStateModule = require('./diva-state');
+
 let divaConfig;
 let divaState;
 
@@ -347,34 +349,21 @@ function getIrmaIssueStatus(irmaSessionId) {
       };
     });
 }
-
-/**
-* Module exports.
-* @public
-*/
-module.exports = function init(state, options) {
-  if (state === undefined) {
-    throw new Error('You must call this module with a state object, see documentation');
-  }
-
+function init(options) {
   divaConfig = {
     ...defaults,
     ...options,
   };
 
-  divaState = state;
+  divaState = divaStateModule.init(divaConfig);
+}
 
-  return {
-    startDisclosureSession,
-    startSignatureSession,
-    startIssueSession,
-    getIrmaSignatureStatus,
-    getIrmaIssueStatus,
-  };
-};
-
-// TODO: import check via wrapper file?
-
+/**
+* Module exports.
+* @public
+*/
+module.exports = init;
+module.exports.init = init;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
 module.exports.startIssueSession = startIssueSession;
