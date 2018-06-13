@@ -1,6 +1,6 @@
 {
   "name": "diva-irma-js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "An SDK to easily integrate IRMA (https://privacybydesign.foundation/irma/) into NodeJS based apps.",
   "main": "diva-irma.js",
   "scripts": {
@@ -21,9 +21,12 @@
   "files": [
     "CONTRIBUTING.md",
     "README.md",
-    "src/*",
-    "diva.js",
-    "LICENSE"
+    "config/*",
+    "diva-state/*",
+    "LICENSE",
+    "diva-irma.js",
+    "express.js",
+    "session.js"
   ],
   "contributors": [
     "Koen van Ingen",

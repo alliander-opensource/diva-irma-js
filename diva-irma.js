@@ -20,6 +20,7 @@ const jwt = require('jsonwebtoken');
 const request = require('superagent');
 
 const defaults = require('./config/default-config');
+const packageJson = require('./package.json');
 
 function updateQRContentWithApiEndpoint(qrContent, endpoint) {
   return {
@@ -349,6 +350,11 @@ function getIrmaIssueStatus(irmaSessionId) {
       };
     });
 }
+
+function version() {
+  return packageJson.version;
+}
+
 function init(options) {
   divaConfig = {
     ...defaults,
@@ -370,3 +376,4 @@ module.exports.startIssueSession = startIssueSession;
 module.exports.getIrmaSignatureStatus = getIrmaSignatureStatus;
 module.exports.getIrmaIssueStatus = getIrmaIssueStatus;
 module.exports.getIrmaDisclosureStatus = getIrmaDisclosureStatus;
+module.exports.version = version;
