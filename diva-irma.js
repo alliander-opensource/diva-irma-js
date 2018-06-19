@@ -1,5 +1,5 @@
 /*!
- * diva-irma
+ * diva-irma-js
  * Module that manages connection with IRMA API Server
  * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
  * BSD 3-Clause License
@@ -184,7 +184,6 @@ function completeDisclosureSession(irmaSessionId, token) {
   return verifyIrmaApiServerJwt(token, divaConfig.jwtIrmaApiServerVerifyOptions)
     .then((disclosureProofResult) => {
       divaState.setIrmaEntry(irmaSessionId, 'COMPLETED'); // Async
-      // TODO: .then(proofResult => addIrmaProof(proofResult, irmaSessionId))
       return { disclosureProofResult, proofStatus: disclosureProofResult.status };
     });
 }
@@ -240,7 +239,6 @@ function getIrmaDisclosureStatus(irmaSessionId) {
       }
 
       // This is for when we poll again
-      // TODO: does this work?
       if (disclosureStatus === 'COMPLETED') {
         return {
           disclosureStatus,
@@ -288,7 +286,6 @@ function getIrmaSignatureStatus(irmaSessionId) {
       }
 
       // This is for when we poll again
-      // TODO: does this work?
       if (signatureStatus === 'COMPLETED') {
         return {
           signatureStatus,

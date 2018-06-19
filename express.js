@@ -1,5 +1,6 @@
 /*!
- * diva-express
+ * diva-irma-js
+ * Express middleware module for Diva
  * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
  * BSD 3-Clause License
  */

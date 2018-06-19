@@ -1,6 +1,6 @@
 /*!
- * diva-state-redis
- * Diva state module for in-mem storage
+ * diva-irma-js
+ * Diva state in-mem storage module
  * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
  * BSD 3-Clause License
  */

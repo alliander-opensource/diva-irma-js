@@ -1,5 +1,6 @@
 /*!
- * diva-session
+ * diva-irma-js
+ * Session module for Diva
  * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
  * BSD 3-Clause License
  */
@@ -52,13 +53,14 @@ function getMissingAttributes(divaSessionId, requiredAttributes) {
     });
 }
 
-function addIrmaProofToSession(proofResult, irmaSessionId) {
+function addAttributesFromProof(proofResult, irmaSessionId) {
   const divaSessionId = proofResult.jti;
 
   return divaState.getDivaEntry(divaSessionId)
     .then(divaStateEntry =>
       divaState.setDivaEntry(divaSessionId, {
         ...divaStateEntry,
+        // Invalid attributes will be added as well, it'll be filtered with getAttributes()
         [irmaSessionId]: proofResult,
       }),
     );
@@ -106,6 +108,6 @@ module.exports.getAttributes = getAttributes;
 module.exports.getProofs = getProofs;
 module.exports.removeDivaSession = removeDivaSession;
 module.exports.getProofStatus = getProofStatus;
-module.exports.addIrmaProofToSession = addIrmaProofToSession;
+module.exports.addAttributesFromProof = addAttributesFromProof;
 module.exports.requireAttributes = requireAttributes;
 module.exports.getMissingAttributes = getMissingAttributes;

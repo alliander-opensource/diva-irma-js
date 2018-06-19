@@ -1,5 +1,6 @@
 /*!
- * diva-state
+ * diva-irma-js
+ * Diva state module for IRMA and HTTP session storage
  * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
  * BSD 3-Clause License
  */
@@ -10,6 +11,8 @@
 */
 
 const defaults = require('../config/default-config');
+const divaRedis = require('./diva-state-redis');
+const divaMem = require('./diva-state-mem');
 
 let divaState;
 
@@ -25,15 +28,15 @@ function init(options) {
   };
 
   if (divaConfig.useRedis) {
-    divaState = require('./diva-state-redis'); // eslint-disable-line global-require
-    divaState.init(divaConfig.redisOptions);
+    divaRedis.init(divaConfig.redisOptions);
+    divaState = divaRedis;
   } else {
-    divaState = require('./diva-state-mem'); // eslint-disable-line global-require
-    divaState.init();
+    divaMem.init();
+    divaState = divaMem;
   }
 
   return divaState;
-};
+}
 
 /**
 * Module exports.
