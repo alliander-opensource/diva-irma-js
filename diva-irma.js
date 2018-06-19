@@ -211,140 +211,97 @@ function getSignatureFromApiServer(irmaSessionId) {
     .then(signature => completeSignatureSession(irmaSessionId, signature));
 }
 
-function getIrmaDisclosureStatus(irmaSessionId) {
-  const getDisclosureStatus = divaState.getIrmaEntry(irmaSessionId);
-  const getServerStatus = request
-    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.verificationEndpoint}/${irmaSessionId}/status`)
+function getIrmaEndpoint(irmaSessionType) {
+  switch (irmaSessionType) {
+    case 'ISSUE':
+      return divaConfig.issueEndpoint;
+    case 'DISCLOSE':
+      return divaConfig.verificationEndpoint;
+    case 'SIGN':
+      return divaConfig.signatureEndpoint;
+    default: {
+      const e = new Error(`Invalid irmaSessionType: ${irmaSessionType}`);
+      throw e;
+    }
+  }
+}
+
+function getIrmaServerStatus(irmaEndpoint, irmaSessionId) {
+  return request
+    .get(`${divaConfig.irmaApiServerUrl}${irmaEndpoint}/${irmaSessionId}/status`)
     .type('text/plain')
     .then(result => result.body)
     .catch(() => { // eslint-disable-line arrow-body-style
       // The IRMA api server returns an error on expired sessions.
       // For now we treat all errors as non-existing irma disclosure sessions.
       return 'NOT_FOUND';
-    });
-
-  return BPromise
-    .all([
-      getDisclosureStatus,
-      getServerStatus,
-    ])
-    .spread((disclosureStatus, serverStatus) => {
-      if (serverStatus === 'DONE') {
-        return getDisclosureProofFromApiServer(irmaSessionId)
-          .then(disclosureProof => ({
-            disclosureStatus: 'COMPLETED',
-            serverStatus,
-            ...disclosureProof,
-          }));
-      }
-
-      // This is for when we poll again
-      if (disclosureStatus === 'COMPLETED') {
-        return {
-          disclosureStatus,
-        };
-      }
-
-      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
-        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-        return {
-          disclosureStatus: 'ABORTED',
-          serverStatus,
-        };
-      }
-
-      // Pending
-      return { disclosureStatus, serverStatus };
     });
 }
 
-function getIrmaSignatureStatus(irmaSessionId) {
-  const getSignatureStatus = divaState.getIrmaEntry(irmaSessionId);
-  const getServerStatus = request
-    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/${irmaSessionId}/status`)
-    .type('text/plain')
-    .then(result => result.body)
-    .catch(() => { // eslint-disable-line arrow-body-style
-      // The IRMA api server returns an error on expired sessions.
-      // For now we treat all errors as non-existing irma disclosure sessions.
-      return 'NOT_FOUND';
-    });
+function abortIrmaSession(irmaSessionId, serverStatus) {
+  divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
+  return {
+    irmaSessionStatus: 'ABORTED',
+    serverStatus,
+  };
+}
+
+function completeIrmaSession(irmaSessionType, irmaSessionId) {
+  const completeStatus = {
+    irmaSessionStatus: 'COMPLETED',
+    serverStatus: 'DONE',
+  };
+
+  switch (irmaSessionType) {
+    case 'DISCLOSE':
+      return getDisclosureProofFromApiServer(irmaSessionId)
+        .then(result => ({
+          ...result,
+          ...completeStatus,
+        }));
+    case 'SIGN':
+      return getSignatureFromApiServer(irmaSessionId)
+        .then(result => ({
+          ...result,
+          ...completeStatus,
+        }));
+    case 'ISSUE':
+      // Issuance sessions are easier than disclosure or signing sessions,
+      // as we don't have to retrieve a proof or signature at the end of the session.
+      return completeStatus;
+    default: {
+      const e = new Error(`Invalid irmaSessionType: ${irmaSessionType}`);
+      throw e;
+    }
+  }
+}
+
+function getIrmaStatus(irmaSessionType, irmaSessionId) {
+  const irmaEndpoint = getIrmaEndpoint(irmaSessionType);
+  const irmaSessionStatusPromise = divaState.getIrmaEntry(irmaSessionId);
+  const irmaServerStatusPromise = getIrmaServerStatus(irmaEndpoint, irmaSessionId);
 
   return BPromise
     .all([
-      getSignatureStatus,
-      getServerStatus,
+      irmaSessionStatusPromise,
+      irmaServerStatusPromise,
     ])
-    .spread((signatureStatus, serverStatus) => {
+    .spread((irmaSessionStatus, serverStatus) => {
       if (serverStatus === 'DONE') {
-        return getSignatureFromApiServer(irmaSessionId)
-          .then(signature => ({
-            signatureStatus: 'COMPLETED',
-            serverStatus,
-            ...signature,
-          }));
+        return completeIrmaSession(irmaSessionType, irmaSessionId);
       }
 
       // This is for when we poll again
-      if (signatureStatus === 'COMPLETED') {
-        return {
-          signatureStatus,
-        };
+      if (irmaSessionStatus === 'COMPLETED') {
+        return { irmaSessionStatus, serverStatus };
       }
 
       if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
-        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-        return {
-          signatureStatus: 'ABORTED',
-          serverStatus,
-        };
+        return abortIrmaSession(irmaSessionId, serverStatus);
       }
 
       // Pending
-      return { signatureStatus, serverStatus };
-    });
-}
-
-function getIrmaIssueStatus(irmaSessionId) {
-  const getIssueStatus = divaState.getIrmaEntry(irmaSessionId);
-  const getServerStatus = request
-    .get(`${divaConfig.irmaApiServerUrl}${divaConfig.issueEndpoint}/${irmaSessionId}/status`)
-    .type('text/plain')
-    .then(result => result.body)
-    .catch(() => { // eslint-disable-line arrow-body-style
-      // The IRMA api server returns an error on expired sessions.
-      // For now we treat all errors as non-existing irma disclosure sessions.
-      return 'NOT_FOUND';
-    });
-
-  // Issuance sessions are easier than disclosure or signing sessions, as we don't have to retrieve
-  // a proof or signature at the end of the session.
-  return BPromise
-    .all([
-      getIssueStatus,
-      getServerStatus,
-    ])
-    .spread((issueStatus, serverStatus) => {
-      if (serverStatus === 'DONE') {
-        return {
-          issueStatus: 'COMPLETED',
-          serverStatus,
-        };
-      }
-
-      // Issuance status is PENDING
-      // Set issueStatus to ABORTED when serverStatus is CANCELLED or NOT_FOUND
-      if (serverStatus === 'CANCELLED' || serverStatus === 'NOT_FOUND') {
-        divaState.setIrmaEntry(irmaSessionId, 'ABORTED'); // Async
-        return {
-          issueStatus: 'ABORTED',
-          serverStatus,
-        };
-      }
-      return {
-        issueStatus,
-        serverStatus,
-      };
+      return { irmaSessionStatus, serverStatus };
     });
 }
 
@@ -370,7 +327,5 @@ module.exports.init = init;
 module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
 module.exports.startIssueSession = startIssueSession;
-module.exports.getIrmaSignatureStatus = getIrmaSignatureStatus;
-module.exports.getIrmaIssueStatus = getIrmaIssueStatus;
-module.exports.getIrmaDisclosureStatus = getIrmaDisclosureStatus;
+module.exports.getIrmaStatus = getIrmaStatus;
 module.exports.version = version;
