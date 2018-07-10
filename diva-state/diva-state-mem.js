@@ -6,6 +6,7 @@
  */
 
 const BPromise = require('bluebird');
+const logger = require('../diva-logger')('divaState');
 
 const divaState = {};
 const irmaState = {};
@@ -14,6 +15,7 @@ function init() {
 }
 
 function getDivaEntry(divaSessionId) {
+  logger.debug(`Obtaining DivaEntry for: ${divaSessionId}`);
   return BPromise.resolve(
     (divaState[divaSessionId] !== undefined)
       ? divaState[divaSessionId]
@@ -22,20 +24,24 @@ function getDivaEntry(divaSessionId) {
 }
 
 function setDivaEntry(divaSessionId, entry) {
+  logger.debug(`Setting DivaEntry for: ${divaSessionId}`);
   divaState[divaSessionId] = entry;
   return BPromise.resolve(divaState);
 }
 
 function deleteDivaEntry(divaSessionId) {
+  logger.debug(`Delete DivaEntry for: ${divaSessionId}`);
   divaState[divaSessionId] = {};
   return BPromise.resolve(divaState);
 }
 
 function getIrmaEntry(irmaSessionId) {
+  logger.debug(`Obtain IrmaEntry for: ${irmaSessionId}`);
   return BPromise.resolve(irmaState[irmaSessionId]);
 }
 
 function setIrmaEntry(irmaSessionId, state) {
+  logger.debug(`Setting IrmaEntry for: ${irmaSessionId}`);
   irmaState[irmaSessionId] = state;
   return BPromise.resolve(irmaState);
 }

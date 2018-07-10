@@ -6,6 +6,7 @@
  */
 
 const divaStateModule = require('./diva-state');
+const logger = require('./diva-logger')('divaIrma');
 
 let divaConfig;
 let divaState;
@@ -43,6 +44,7 @@ function attributeToContent(attribute, attributeLabel) {
  * @returns {Promise<json>} Session token and content of IRMA QR
  */
 function requestIrmaSession(endpoint, jwtBody) {
+  logger.debug(`Requesting irma session for endpoint: ${endpoint} with jwt: ${jwtBody}`);
   return request
     .post(divaConfig.irmaApiServerUrl + endpoint)
     .type('text/plain')
@@ -56,7 +58,9 @@ function requestIrmaSession(endpoint, jwtBody) {
     })
     .catch((error) => {
       // TODO: make this a typed error
+      logger.debug(error);
       const e = new Error(`Error starting IRMA session: ${error.message}`);
+      logger.warn(e);
       throw e;
     });
 }
@@ -86,6 +90,7 @@ function startDisclosureSession(
   attributeLabel,
   divaSessionId,
 ) {
+  logger.trace('calling startDisclosureSession()');
   const content = generateDisclosureContent(attributes, attributeLabel);
 
   const sprequest = {
@@ -113,6 +118,7 @@ function startSignatureSession(
   attributeLabel,
   message,
 ) {
+  logger.trace('calling startSignatureSession()');
   const content = generateDisclosureContent(attributes, attributeLabel);
 
   const absrequest = {
@@ -145,6 +151,7 @@ function startSignatureSession(
  * @returns {Promise<json>} Session token and content of IRMA QR
  */
 function startIssueSession(credentials, attributes, attributeLabel) {
+  logger.trace('calling startIssueSession()');
   const disclose = (attributes !== undefined)
     ? generateDisclosureContent(attributes, attributeLabel)
     : null;
@@ -271,12 +278,14 @@ function completeIrmaSession(irmaSessionType, irmaSessionId) {
       return completeStatus;
     default: {
       const e = new Error(`Invalid irmaSessionType: ${irmaSessionType}`);
+      logger.warn(e);
       throw e;
     }
   }
 }
 
 function getIrmaStatus(irmaSessionType, irmaSessionId) {
+  logger.trace('calling getIrmaStatus()');
   const irmaEndpoint = getIrmaEndpoint(irmaSessionType);
   const irmaSessionStatusPromise = divaState.getIrmaEntry(irmaSessionId);
   const irmaServerStatusPromise = getIrmaServerStatus(irmaEndpoint, irmaSessionId);
@@ -306,10 +315,14 @@ function getIrmaStatus(irmaSessionType, irmaSessionId) {
 }
 
 function version() {
+  logger.trace('calling version()');
   return packageJson.version;
 }
 
 function init(options) {
+  logger.level = options.logLevel ? options.logLevel : 'off';
+  logger.trace('calling init()');
+
   divaConfig = {
     ...defaults,
     ...options,
