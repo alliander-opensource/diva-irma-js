@@ -10,6 +10,7 @@
 * @private
 */
 
+const logger = require('../diva-logger')('divaState');
 const defaults = require('../config/default-config');
 const divaRedis = require('./diva-state-redis');
 const divaMem = require('./diva-state-mem');
@@ -17,6 +18,9 @@ const divaMem = require('./diva-state-mem');
 let divaState;
 
 function init(options) {
+  logger.level = options.logLevel ? options.logLevel : 'off';
+  logger.trace('calling init()');
+
   // Don't init again if we have already in other function
   if (divaState !== undefined) {
     return divaState;
@@ -28,9 +32,11 @@ function init(options) {
   };
 
   if (divaConfig.useRedis) {
+    logger.debug('Using redis voor session storage');
     divaRedis.init(divaConfig.redisOptions);
     divaState = divaRedis;
   } else {
+    logger.debug('Using in-mem session storage');
     divaMem.init();
     divaState = divaMem;
   }

@@ -4,6 +4,7 @@
  * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
  * BSD 3-Clause License
  */
+const logger = require('./diva-logger')('express');
 
 /**
 * Module dependencies.
@@ -12,6 +13,7 @@
 
 function requireAttributes(divaSession, attributes) {
   return (req, res, next) => {
+    logger.trace('calling requireAttributes()');
     divaSession.getMissingAttributes(req.sessionId, attributes)
       .then((missingAttributes) => {
         if (missingAttributes.length === 0) {
@@ -29,8 +31,14 @@ function requireAttributes(divaSession, attributes) {
   };
 }
 
+function setLogLevel(level) {
+  logger.level = level;
+  logger.trace('calling setLogLevel()');
+}
+
 /**
 * Module exports.
 * @public
 */
 module.exports.requireAttributes = requireAttributes;
+module.exports.setLogLevel = setLogLevel;
