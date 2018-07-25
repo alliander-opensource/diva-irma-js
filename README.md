@@ -5,7 +5,7 @@ DIVA is an SDK to easily integrate [IRMA attributes](https://privacybydesign.fou
 
 ## Overview
 
-This library consist of the following part, which can work independent from each other:
+This library consists of the following parts, which can work independent from each other:
 
 - diva-irma-js
     - A library that allows NodeJS backend applications to easily communicate with an [IRMA API server](https://github.com/privacybydesign/irma_api_server)
@@ -22,7 +22,7 @@ This library consist of the following part, which can work independent from each
 
 ## Example / reference implementation
 
-For a full starter project that shows how to use the three core components with examples, see the [DIVA js Reference Third Party](https://github.com/Alliander/diva-js-reference-3p)
+For a full starter project that shows how to use the three core components with examples, see the [DIVA js Reference Third Party Backend](https://github.com/Alliander/diva-js-reference-3p-backend)
 
 ## Usage
 
@@ -34,7 +34,7 @@ Then import/require the relevant Diva components:
 
 ### Quick start guide: verifying an attribute
 
-See the API reference below for more details and points on each step. Also, see (the [DIVA js Reference Third Party](https://github.com/Alliander/diva-js-reference-3p) for an example).
+See the API reference below for more details and points on each step. Also, see (the [DIVA js Reference Third Party Backend](https://github.com/Alliander/diva-js-reference-3p-backend) for an example).
 
 First initialize `diva-irma-js/session`:
 
@@ -128,7 +128,7 @@ This module is initialized in the following way:
 The following options can be passed to divaState:
 
 - `useRedis`: True/False (Use Redis or in-mem storage)
-- `redisOptions`: Dict with redis options, namely:
+- `redisOptions`: Object with redis options, namely:
     - `host`: Redis host
     - `port`: Redis port
     - `password`: Redis password
@@ -146,7 +146,7 @@ _BASIC functions:_
 - `getAttributes(divaSessionId)`
     - Obtain attributes belonging to a session. All non-valid attributes are filtered and won't be returned.
     - This method can be used to check which attribute a user has disclosed in earlier IRMA sessions.
-- `addAttributesFromProof(irmaSessionId)`:
+- `addAttributesFromProof(irmaSessionId)`
     - Add IRMA attributes from an IRMA session to a Diva Session.
     - This way, attributes can later be obtained using `getAttributes(divaSessionId)`.
     - Note that this function *must* be called after an IRMA session is done. See [src/actions/irma-session-status.js](https://github.com/Alliander/diva-js-reference-3p-backend/blob/develop/src/actions/irma-session-status.js) in the [DIVA js Reference Third Party](https://github.com/Alliander/diva-js-reference-3p) for an example.
@@ -185,14 +185,14 @@ In this way, `/api/endpont/to/protect` can only be visited if a user had disclos
 
 The core library is used for communication with the IRMA Api Server. It therefore requires a working IRMA Api Server.
 
-To run your own local IRMA API SERVER, see its [README](https://github.com/privacybydesign/irma_api_server/blob/master/README.md). We recommend running it with [Docker](https://github.com/privacybydesign/irma_api_server#running-with-docker), because that save a lot of configuration. The 'Running With Docker tutorial' also shows a script that will generate the required public key.
+To run your own local IRMA Api Server, see its [README](https://github.com/privacybydesign/irma_api_server/blob/master/README.md). We recommend running it with [Docker](https://github.com/privacybydesign/irma_api_server#running-with-docker), because that saves a lot of configuration. The 'Running With Docker tutorial' also shows a script that will generate the required public key.
 
 This module depends on `diva-irma-js/state`, and therefore depends on the `diva-irma-js/session` options, see above.
 
 ```
     const diva = require('diva-irma-js');       // Import diva library
-    const divaStateOptions = {};                // divaStateOptions are needed here as well, see above.
-    const divaOptions = {                       // Options for ApiServer communication
+    const divaStateOptions = {};                // divaStateOptions are needed here as well, see above
+    const divaOptions = {                       // Options for ApiServer communication, see below
       ...divaStateOptions
     };
     diva.init(divaOptions);                     // Init Diva library
@@ -200,11 +200,11 @@ This module depends on `diva-irma-js/state`, and therefore depends on the `diva-
 
 #### divaOptions
 - `baseUrl`: URL (port included) on which the backend that uses this library is available.
-- `apiKey`:  JWT Private key to sign requests to the Api Server with. See the [README](https://github.com/privacybydesign/irma_api_server#jwt-keys) of the IRMA Api Server on how to configure these at the server. Note that the [Docker](https://github.com/privacybydesign/irma_api_server#running-with-docker) version of the IRMA Api Server by defaults accepts unsigned requets, so if you're using that version this field can be omitted.
+- `apiKey`:  JWT Private key to sign requests to the Api Server with. See the [README](https://github.com/privacybydesign/irma_api_server#jwt-keys) of the IRMA Api Server on how to configure these at the server. Note that the [Docker](https://github.com/privacybydesign/irma_api_server#running-with-docker) version of the IRMA Api Server by defaults accepts unsigned requests, so if you're using that version this field can be omitted.
 - `irmaApiServerUrl`: URL of the IRMA Api Server (port included).
-- `irmaApiServerPublicKey`: Public key of the IRMA Api Server. This key is needed to verify JWT responses from the IRMA Api Server. The script that is used to run the Docker version of the IRMA Api Server will print this key for yiou.
+- `irmaApiServerPublicKey`: Public key of the IRMA Api Server. This key is needed to verify JWT responses from the IRMA Api Server. The script that is used to run the Docker version of the IRMA Api Server will print this key for you.
 - `jwtDisclosureRequestOptions`, `jwtIssueRequestOptions`, `jwtSignatureRequestOptions`: JWT options for requests that are sent to the IRMA Api Server, which are:
-    - `subject`: Subject of the JWT token, should be `verification_request`, `issue_request` and `signature_request` in order to get the JWT accepted by the IRMA APi Server
+    - `subject`: Subject of the JWT token, should be `verification_request`, `issue_request` and `signature_request` in order to get the JWT accepted by the IRMA Api Server
     - `algorithm`: JWT signing algorithm, should be 'none' of no apiKey is set up. Otherwise, use `RS256`.
     - `issuer`: The issuer of this JWT, an issuer corresponds in the IRMA Api Server to a private key (apiKey in Diva). The issuer is also shown in the IRMA App after scanning a QR code. The Docker version of the IRMA Api Server accepts all possible values for issuer.
 - `logLevel`: [log4js](https://www.npmjs.com/package/log4js) log level (TRACE is most fine-grained)
@@ -216,12 +216,12 @@ See the [DIVA js Reference Third Party](https://github.com/Alliander/diva-js-ref
 
 _Starting an IRMA session_:
 
-Use one of these three functions to respectively start a disclosure, signing or issuing session. All these functions return an `irmaSessionData` object, which needs to be passed to the user in the form of a QR code.
+Use one of these three functions to respectively starts a disclosure, signing or issuing session. All these functions return an `irmaSessionData` object, which needs to be passed to the user in the form of a QR code.
 
 - `startDisclosureSession(attributes, attributeLabel, divaSessionId)`: Start an IRMA Disclosure session. Attributes is an array of requested IRMA attributes (for instance `['irma-demo.MijnOverheid.address.street']`. Together, they will construct the `content` object that is sent to the IRMA Api Server. `divaSesssionId` is the Diva session where the resulting IRMA session will be connected to. `attributeLabel` can be any string.
    Alternatively, attributes can be defined as 'a set of conjunctions containing disjunctions, a concept that is more powerful (but complex) and explained [here](http://credentials.github.io/protocols/irma-protocol/#verification).
-- `startSignatureSession(attributes, attributeLabel, message,)`: Start an IRMA Signature session. In addition to attributes and a label, the message to be signed need to be provided as well.
-- `startIssueSession(credentials, attributes, attributeLabel)`: Start an IRMA Issue session. See http://credentials.github.io/protocols/irma-protocol/#issuing on how to define `credentials`. `Attributes` and `AttributeLabel` are optional here and only needed if you want to disclose attributes before issuing.
+- `startSignatureSession(attributes, attributeLabel, message,)`: Start an IRMA Signature session. In addition to attributes and a label, the message to be signed needs to be provided as well.
+- `startIssueSession(credentials, attributes, attributeLabel)`: Start an IRMA Issue session. See http://credentials.github.io/protocols/irma-protocol/#issuing on how to define `credentials`. `Attributes` and `AttributeLabel` are optional here and only needed if you want to let the user disclose attributes before issuing.
 
 _Polling the status of a running session:_:
 
@@ -236,9 +236,9 @@ ServerStatus is the status that is returned by the IRMA Api Server, which can be
 - `CONNECTED`: User scanned the QR code and connected to the Api Server with the IRMA App.
 - `CANCELLED`: User cancelled on the phone (or doesn't possess the required attributes/forgot his pin/etc.).
 - `DONE`: The IRMA session has been done, a disclosure proof or signature can be retrieved.
-- `NOT_FOUND`: The IRMA session cannot be found. (note that sessions that are done and, will also be `NOT_FOUND` after the proof has been retrieved.
+- `NOT_FOUND`: The IRMA session cannot be found. (note that sessions that are done will also be `NOT_FOUND` after the proof has been retrieved.
 
-IrmaSessionStatus is Divas own locally cached version of the ServerStatus (mainly to prevent `NOT_FOUND` after the session is done):
+IrmaSessionStatus is Diva's own locally cached version of the ServerStatus (mainly to prevent `NOT_FOUND` after the session is done):
 - `PENDING`: Session has been created at server.
 - `ABORTED`: User cancelled on the phone (or doesn't possess the required attributes/forgot his pin/etc.).
 - `COMPLETED`: The IRMA session has been done, a disclosure proof or signature can be retrieved.
