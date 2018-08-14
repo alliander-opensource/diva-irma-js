@@ -16,6 +16,7 @@ let divaState;
 * @private
 */
 
+const base64 = require('base-64');
 const BPromise = require('bluebird');
 const jwt = require('jsonwebtoken');
 const request = require('superagent');
@@ -314,6 +315,43 @@ function getIrmaStatus(irmaSessionType, irmaSessionId) {
     });
 }
 
+function jsonQuoteNumberValues(payload) {
+  // Regex for quoting unquoted JSON number values
+  return payload.replace(/: ?(-?\d+)/g, ':"$1"');
+}
+
+function signatureFromToken(token) {
+  // Because of the large numeric values overflowing, custom parsing is needed.
+  const base64Body = token.split('.')[1];
+  const base64Clean = base64Body.replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    const quoted = jsonQuoteNumberValues(base64.decode(base64Clean));
+    const { signature } = JSON.parse(quoted);
+    return JSON.stringify(signature);
+  } catch (error) {
+    logger.debug(error);
+    const e = new Error(`Error parsing jwt error: ${error.message}`);
+    logger.warn(e);
+    throw e;
+  }
+}
+
+function checkSignature(token) {
+  logger.trace(`Checking signature with token: ${token}`);
+  const signature = signatureFromToken(token);
+  return request
+    .post(`${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/checksignature`)
+    .type('application/json')
+    .send(signature)
+    .then(result => verifyIrmaApiServerJwt(result.text))
+    .catch((error) => {
+      logger.debug(error);
+      const e = new Error(`Error checking signature: ${error.message}`);
+      logger.warn(e);
+      throw e;
+    });
+}
+
 function version() {
   logger.trace('calling version()');
   return packageJson.version;
@@ -341,4 +379,6 @@ module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
 module.exports.startIssueSession = startIssueSession;
 module.exports.getIrmaStatus = getIrmaStatus;
+module.exports.signatureFromToken = signatureFromToken;
+module.exports.checkSignature = checkSignature;
 module.exports.version = version;
