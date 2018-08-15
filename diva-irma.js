@@ -315,8 +315,13 @@ function getIrmaStatus(irmaSessionType, irmaSessionId) {
 }
 
 function jsonQuoteNumberValues(payload) {
-  // Regex for quoting unquoted JSON number values
+  // Regex for quoting unquoted JSON number values in the signature
   return payload.replace(/: ?(-?\d+)/g, ':"$1"');
+}
+
+function signatureUnquoteNumberValues(payload) {
+  // Regex for unquoting quoted JSON number values in the signature
+  return payload.replace(/"(-?\d\d+)"/g, '$1');
 }
 
 function signatureFromToken(token) {
@@ -327,13 +332,13 @@ function signatureFromToken(token) {
   // 2. Decode the JWT, which is base64 encoded
   // 3. Quote the numeric values for protection
   // 4. Read the structure with JSON.parse and select the signature
-  // NOTE: As the API can deal with quoted numbers, there is no need to unquote.
+  // 5. Unquote the numeric values in the signature
   const base64Body = token.split('.')[1];
   const base64Clean = base64Body.replace(/-/g, '+').replace(/_/g, '/');
   try {
     const quoted = jsonQuoteNumberValues(new Buffer(base64Clean, 'base64').toString('ascii'));
     const { signature } = JSON.parse(quoted);
-    return JSON.stringify(signature);
+    return signatureUnquoteNumberValues(JSON.stringify(signature));
   } catch (error) {
     logger.debug(error);
     const e = new Error(`Error parsing jwt error: ${error.message}`);
@@ -385,6 +390,7 @@ module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
 module.exports.startIssueSession = startIssueSession;
 module.exports.getIrmaStatus = getIrmaStatus;
+module.exports.signatureUnquoteNumberValues = signatureUnquoteNumberValues;
 module.exports.signatureFromToken = signatureFromToken;
 module.exports.checkSignature = checkSignature;
 module.exports.version = version;
