@@ -16,7 +16,6 @@ let divaState;
 * @private
 */
 
-const base64 = require('base-64');
 const BPromise = require('bluebird');
 const jwt = require('jsonwebtoken');
 const request = require('superagent');
@@ -332,7 +331,7 @@ function signatureFromToken(token) {
   const base64Body = token.split('.')[1];
   const base64Clean = base64Body.replace(/-/g, '+').replace(/_/g, '/');
   try {
-    const quoted = jsonQuoteNumberValues(base64.decode(base64Clean));
+    const quoted = jsonQuoteNumberValues(new Buffer(base64Clean, 'base64').toString('ascii'));
     const { signature } = JSON.parse(quoted);
     return JSON.stringify(signature);
   } catch (error) {

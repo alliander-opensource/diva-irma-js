@@ -45,7 +45,6 @@
     "eslint-plugin-react": "7.4.0"
   },
   "dependencies": {
-    "base-64": "0.1.0",
     "bluebird": "3.5.1",
     "chai": "4.1.2",
     "jsonwebtoken": "8.1.0",
