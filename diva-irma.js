@@ -1,7 +1,7 @@
 /*!
  * diva-irma-js
  * Module that manages connection with IRMA API Server
- * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
+ * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof, Nico Rikken
  * BSD 3-Clause License
  */
 
@@ -321,7 +321,14 @@ function jsonQuoteNumberValues(payload) {
 }
 
 function signatureFromToken(token) {
-  // Because of the large numeric values overflowing, custom parsing is needed.
+  // The IRMA signature contains large numerical values. The `jsonwebtoken`
+  // library and even the `JSON.parse` command cannot handle these numeric
+  // values. The token will therefore be split using a custom procedure:
+  // 1. Take the body, not the headers
+  // 2. Decode the JWT, which is base64 encoded
+  // 3. Quote the numeric values for protection
+  // 4. Read the structure with JSON.parse and select the signature
+  // NOTE: As the API can deal with quoted numbers, there is no need to unquote.
   const base64Body = token.split('.')[1];
   const base64Clean = base64Body.replace(/-/g, '+').replace(/_/g, '/');
   try {
