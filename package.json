@@ -5,7 +5,7 @@
   "main": "diva-irma.js",
   "scripts": {
     "lint": "./node_modules/.bin/eslint -c .eslintrc *.js diva-state/*.js config/*.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha '**/*.e2e.js' --exit"
   },
   "repository": {
     "type": "git",
@@ -39,13 +39,17 @@
     "eslint": "4.8.0",
     "eslint-config-airbnb": "15.1.0",
     "eslint-plugin-import": "2.7.0",
+    "eslint-plugin-jasmine": "2.10.1",
     "eslint-plugin-jsx-a11y": "5.1.1",
+    "eslint-plugin-mocha": "5.2.0",
     "eslint-plugin-react": "7.4.0"
   },
   "dependencies": {
     "bluebird": "3.5.1",
+    "chai": "4.1.2",
     "jsonwebtoken": "8.1.0",
     "log4js": "2.10.0",
+    "mocha": "5.2.0",
     "redis": "2.8.0",
     "request": "2.87.0",
     "superagent": "3.8.3"

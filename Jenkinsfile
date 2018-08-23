@@ -13,6 +13,6 @@ node{
   }
 
   stage ('Test') {
-    sh 'echo TODO'
+    sh 'npm run test'
   }
 }

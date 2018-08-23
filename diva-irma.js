@@ -1,7 +1,7 @@
 /*!
  * diva-irma-js
  * Module that manages connection with IRMA API Server
- * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof
+ * Copyright(c) 2017 Alliander, Koen van Ingen, Timen Olthof, Nico Rikken
  * BSD 3-Clause License
  */
 
@@ -314,6 +314,55 @@ function getIrmaStatus(irmaSessionType, irmaSessionId) {
     });
 }
 
+function jsonQuoteNumberValues(payload) {
+  // Regex for quoting unquoted JSON number values in the signature
+  return payload.replace(/: ?(-?\d+)/g, ':"$1"');
+}
+
+function signatureUnquoteNumberValues(payload) {
+  // Regex for unquoting quoted JSON number values in the signature
+  return payload.replace(/"(-?\d\d+)"/g, '$1');
+}
+
+function signatureFromToken(token) {
+  // The IRMA signature contains large numerical values. The `jsonwebtoken`
+  // library and even the `JSON.parse` command cannot handle these numeric
+  // values. The token will therefore be split using a custom procedure:
+  // 1. Take the body, not the headers
+  // 2. Decode the JWT, which is base64 encoded
+  // 3. Quote the numeric values for protection
+  // 4. Read the structure with JSON.parse and select the signature
+  // 5. Unquote the numeric values in the signature
+  const base64Body = token.split('.')[1];
+  const base64Clean = base64Body.replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    const quoted = jsonQuoteNumberValues(new Buffer(base64Clean, 'base64').toString('ascii'));
+    const { signature } = JSON.parse(quoted);
+    return signatureUnquoteNumberValues(JSON.stringify(signature));
+  } catch (error) {
+    logger.debug(error);
+    const e = new Error(`Error parsing jwt error: ${error.message}`);
+    logger.warn(e);
+    throw e;
+  }
+}
+
+function checkSignature(token) {
+  logger.trace(`Checking signature with token: ${token}`);
+  const signature = signatureFromToken(token);
+  return request
+    .post(`${divaConfig.irmaApiServerUrl}${divaConfig.signatureEndpoint}/checksignature`)
+    .type('application/json')
+    .send(signature)
+    .then(result => verifyIrmaApiServerJwt(result.text))
+    .catch((error) => {
+      logger.debug(error);
+      const e = new Error(`Error checking signature: ${error.message}`);
+      logger.warn(e);
+      throw e;
+    });
+}
+
 function version() {
   logger.trace('calling version()');
   return packageJson.version;
@@ -341,4 +390,7 @@ module.exports.startDisclosureSession = startDisclosureSession;
 module.exports.startSignatureSession = startSignatureSession;
 module.exports.startIssueSession = startIssueSession;
 module.exports.getIrmaStatus = getIrmaStatus;
+module.exports.signatureUnquoteNumberValues = signatureUnquoteNumberValues;
+module.exports.signatureFromToken = signatureFromToken;
+module.exports.checkSignature = checkSignature;
 module.exports.version = version;
