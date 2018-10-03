@@ -191,7 +191,16 @@ function completeDisclosureSession(irmaSessionId, token) {
   return verifyIrmaApiServerJwt(token, divaConfig.jwtIrmaApiServerVerifyOptions)
     .then((disclosureProofResult) => {
       divaState.setIrmaEntry(irmaSessionId, 'COMPLETED'); // Async
-      return { disclosureProofResult, proofStatus: disclosureProofResult.status };
+      const result = { disclosureProofResult, proofStatus: disclosureProofResult.status };
+
+      if (divaConfig.addDisclosureJwt) {
+        return {
+          ...result,
+          jwt: token,
+        };
+      }
+
+      return result;
     });
 }
 
