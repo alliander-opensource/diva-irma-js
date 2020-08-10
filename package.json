@@ -37,7 +37,7 @@
   ],
   "license": "BSD-3-Clause",
   "devDependencies": {
-    "eslint": "4.8.0",
+    "eslint": "4.18.2",
     "eslint-config-airbnb": "15.1.0",
     "eslint-plugin-import": "2.7.0",
     "eslint-plugin-jasmine": "2.10.1",
