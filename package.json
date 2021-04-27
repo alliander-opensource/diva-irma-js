@@ -51,7 +51,7 @@
     "jsonwebtoken": "8.1.0",
     "log4js": "2.10.0",
     "mocha": "5.2.0",
-    "redis": "2.8.0",
+    "redis": "3.1.1",
     "superagent": "3.8.3"
   }
 }
